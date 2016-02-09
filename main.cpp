@@ -6,6 +6,7 @@
 #include <iostream>
 #include <map>
 #include <ctime>
+#include <assert.h>
 
 using namespace cv;
 using namespace std;
@@ -26,6 +27,15 @@ void assignLabels(Mat image, Mat& drawing)
         10
     );
 
+    Mat thresh;
+    threshold(
+        gray,
+        thresh,
+        80,
+        1,
+        THRESH_BINARY
+    );
+
     int erosion_size = 2;
     int square_size  = erosion_size * 2 + 1;
     Mat element = getStructuringElement(
@@ -42,19 +52,65 @@ void assignLabels(Mat image, Mat& drawing)
     double maxLabel;
     minMaxLoc(labels, NULL, &maxLabel);
 
-    RNG rng(1234);
-    vector<Vec3b> colors;
-    for (int i = 0; i <= maxLabel; ++i)
+    int labelCount = (int)(maxLabel) + 1;
+    vector<int> blackCount(labelCount);
+    vector<int>  numPixels(labelCount);
+
+    // for (int i = 0; i < labelCount; ++i)
+        // assert(blackCount[i] == 0 && numPixels[i] == 0);
+
+    for (int i = 0; i < labels.rows; ++i)
     {
-        colors.push_back(Vec3b(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255)));
+        for (int j = 0; j < labels.cols; ++j)
+        {
+            int label        = labels.at<int>(i, j);
+            int thresh_value = thresh.at<uchar>(i, j);
+            // assert(thresh_value == 0 || thresh_value == 1);
+
+            blackCount[label] += thresh_value == 0;  
+            ++numPixels[label];
+        }
     }
 
-    cout << colors.size() << endl;
-    
-    drawing = Mat(image.size(), CV_8UC3);
+
+    vector<int> candidates;
+    // vector<bool> is_candidate(labelCount);
+    float percent_black_acc = 0.90;
+    int min_size_acc = 1000;
+    for (int i = 0; i < labelCount; ++i)
+    {
+        float percent_black = ((float)blackCount[i]) / max(1, numPixels[i]);
+        if (percent_black >= percent_black_acc && numPixels[i] >= min_size_acc)
+        {
+            candidates.push_back(i);
+            // is_candidate[i] = true;
+        }
+    }
+
+    int best_index = 0;
+    int best_size = 0;
+    for (int i = 0; i < candidates.size(); ++i)
+    {
+        if (numPixels[candidates[i]] > best_size)
+        {
+            best_index = candidates[i];
+            best_size = numPixels[i];
+        }
+    }
+
+    RNG rng(1234);
+    vector<Vec3b> colors(labelCount);
+    for (int i = 0; i < labelCount; ++i)
+    {
+        colors[i] = Vec3b(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+    }
+
+    drawing = Mat::zeros(image.size(), CV_8UC3);
     for (int i = 0; i < labels.rows; ++i)
         for (int j = 0; j < labels.cols; ++j)
-            drawing.at<Vec3b>(i, j) = colors[labels.at<int>(i, j)];
+            if (labels.at<int>(i, j) == best_index)
+                drawing.at<Vec3b>(i, j) = Vec3b(0, 255, 0);
+
 }
 
 int main(int argc, char** argv)
@@ -77,6 +133,7 @@ int main(int argc, char** argv)
             vc >> image;
             assignLabels(image, drawing);
 
+            imshow("Source", image);
             imshow("Labels", drawing);
 
             waitKey(20);
