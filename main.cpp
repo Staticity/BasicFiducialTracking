@@ -5,142 +5,13 @@
 #include <string>
 #include <iostream>
 #include <map>
+#include <ctime>
+
+#include "disjoint_set.hpp"
 
 using namespace cv;
 using namespace std;
 
-map<uchar, int> frequency_gray_in_contour(Mat img, const vector<Point>& poly)
-{
-    Mat gray = img;
-    
-    if (img.channels() != 1)
-        cvtColor(gray, gray, CV_BGR2GRAY);
-
-    map<uchar, int> frequencies;
-    Rect r = boundingRect(poly);
-    int x1 = (int)(r.x);
-    int y1 = (int)(r.y);
-    int x2 = x1 + (int)(r.width);
-    int y2 = y1 + (int)(r.height);
-
-    for (int j = x1; j <= x2; ++j)
-    {
-        for (int k = y1; k <= y2; ++k)
-        {
-            // Is this point of the bounding rect in the quad?
-            if (!(pointPolygonTest(poly, Point(j, k), false) < -0.5f))
-            {
-                ++frequencies[img.at<uchar>(k, j)];
-            }
-        }
-    }
-
-    return frequencies;
-}
-
-bool find_square(Mat src, vector<vector<Point> >& contours, vector<Point>& outputSq)
-{
-    if (src.channels() != 1)
-    {
-        return false;
-    }
-
-    // Find quads
-    vector<vector<Point> > quads;
-    for (int i = 0; i < contours.size(); ++i)
-    {
-        vector<Point> approximatePoly;
-        approxPolyDP(contours[i], approximatePoly, 3, true);
-
-        if (approximatePoly.size() == 4)
-        {
-            quads.push_back(approximatePoly);
-        }
-    }
-
-    // map<uchar, int> best_freq;
-    int   best_index    = -1;
-    int   best_size     = -1;
-    float percentage    = 0.0f;
-    float percent_black = 0.5f;
-
-    // Find quad with at least 50% black of greatest size
-    for (int i = 0; i < quads.size(); ++i)
-    {
-        map<uchar, int> freq = frequency_gray_in_contour(src, quads[i]);
-        map<uchar, int>::iterator it;
-
-        int total = 0;
-        for (it = freq.begin(); it != freq.end(); ++it)
-        {
-            total += it->second;
-        }
-
-        float cur_percent = (0.0 + freq[0]) / max(total, 1);
-        if (cur_percent > percent_black)
-        {
-            if (best_index == -1 || total > best_size)
-            {
-                best_index = i;
-                best_size = total;
-                percentage = cur_percent;
-                // best_freq = freq;
-            }
-        }
-    }
-
-    if (best_index == -1)
-    {
-        // no satisfactory quad found
-        return false;
-    }
-
-    // std::cout << best_index << " " << best_size << " " << percentage << std::endl;
-    // map<uchar, int>::iterator it;
-    // for (it = best_freq.begin(); it != best_freq.end(); ++it)
-    // {
-    //     cout << (int)it->first << " " << it->second << endl;
-    // }
-    outputSq = quads[best_index];
-
-    return true;
-}
-
-vector<vector<Point> > get_contours(Mat src, int threshold=100, bool debug_draw_contours=false)
-{
-    Mat img = src.clone();
-
-    // Convert to grayscale
-    if (img.channels() != 1)
-    {
-        cvtColor(img, img, CV_BGR2GRAY);
-    }
-
-    // Canny edge detection
-    Mat canny;
-    vector<Vec4i> hierarchy;
-    vector<vector<Point> > contours;
-    Canny(img, canny, threshold, threshold * 2, 3);
-    findContours(canny, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-
-    if (debug_draw_contours)
-    {
-        RNG rng(0);
-        Mat drawing = Mat::zeros(canny.size(), CV_8UC3);
-        for (int i = 0; i < contours.size(); ++i)
-        {
-            approxPolyDP(contours[i], contours[i], 3, true);
-            if (contours[i].size() != 4) continue;
-            Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
-            drawContours(drawing, contours, i, color, 0, 8, hierarchy, 0, Point());
-        }
-
-        namedWindow("Contours", CV_WINDOW_AUTOSIZE);
-        imshow("Contours", drawing);
-    }
-
-    return contours;
-}
 
 int main(int argc, char** argv)
 {
@@ -149,35 +20,43 @@ int main(int argc, char** argv)
         index = atoi(argv[1]);
 
     VideoCapture vc(index);
-    Mat image, gray, thresh;
 
     if (!vc.isOpened()) return 0;
+
+    Mat image;
     vc >> image;
 
-    namedWindow("Source");
-    namedWindow("Square");
-    while (vc.isOpened())
+    Mat gray;
+    cvtColor(image, gray, CV_BGR2GRAY);
+    
+    Mat adapt;
+    adaptiveThreshold(
+        gray,
+        adapt,
+        255,
+        ADAPTIVE_THRESH_GAUSSIAN_C,
+        THRESH_BINARY,
+        7,
+        10
+    );
+
+//    Mat labels;
+//    connectedComponents(adapt, labels, 4);
+
+//    imshow("Labels", labels);
+
+    if (0)
     {
-        vc >> image;
-        cvtColor(image, gray, CV_BGR2GRAY);
-        threshold(gray, thresh, 200, 255, THRESH_BINARY);
-
-        vector<vector<Point> > contours;
-        contours = get_contours(image, 100, true);
-
-        vector<Point> sq;
-        if (find_square(thresh, contours, sq))
+        namedWindow("Source");
+        while (vc.isOpened())
         {
-            Mat drawing = Mat::zeros(thresh.size(), CV_8UC3);
-            vector<vector<Point> > squares;
-            squares.push_back(sq);
-            drawContours(drawing, squares, 0, Scalar(255, 0, 0), 1, 8);
-            imshow("Square", drawing);
+            vc >> image;
+            cvtColor(image, gray, CV_BGR2GRAY);
+
+            imshow("Source", image);
+
+            if (waitKey(20) == 27)
+                break;
         }
-
-        imshow("Source", image);
-
-        if (waitKey() == 27)
-            break;
     }
 }
