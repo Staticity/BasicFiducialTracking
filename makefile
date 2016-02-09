@@ -1,5 +1,5 @@
 CC          = g++
-CFLAGS      = -Wall -c $(DEBUG)
+CFLAGS      = -Wall -c $(DEBUG) -O3
 LFLAGS      = -Wall $(DEBUG)
 INCLUDE_DIR = -I/usr/local/include/opencv -I/usr/local/include/opencv2
 LIBRARY_DIR = -L/usr/local/lib
