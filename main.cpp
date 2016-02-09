@@ -1,33 +1,20 @@
-#include <cv.h>
-#include <highgui.h>
-#include <imgproc/imgproc.hpp>
+#include <opencv.hpp>
+//#include <opencv/highgui/highgui.hpp>
+//#include <imgproc.hpp>
 
 #include <string>
 #include <iostream>
 #include <map>
 #include <ctime>
 
-#include "disjoint_set.hpp"
-
 using namespace cv;
 using namespace std;
 
-int main(int argc, char** argv)
+void assignLabels(Mat image, Mat& drawing)
 {
-    int index = 0;
-    if (argc > 1)
-        index = atoi(argv[1]);
-
-    VideoCapture vc(index);
-
-    if (!vc.isOpened()) return 0;
-
-    Mat image;
-    vc >> image;
-
     Mat gray;
     cvtColor(image, gray, CV_BGR2GRAY);
-    
+
     Mat adapt;
     adaptiveThreshold(
         gray,
@@ -39,23 +26,62 @@ int main(int argc, char** argv)
         10
     );
 
-//    Mat labels;
-//    connectedComponents(adapt, labels, 4);
+    int erosion_size = 2;
+    int square_size  = erosion_size * 2 + 1;
+    Mat element = getStructuringElement(
+        MORPH_RECT,
+        Size(square_size, square_size),
+        Point(erosion_size, erosion_size)
+    );
 
-//    imshow("Labels", labels);
+    erode(adapt, adapt, element);
 
-    if (0)
+    Mat labels;
+    connectedComponents(adapt, labels, 4);
+
+    double maxLabel;
+    minMaxLoc(labels, NULL, &maxLabel);
+
+    RNG rng(1234);
+    vector<Vec3b> colors;
+    for (int i = 0; i <= maxLabel; ++i)
     {
-        namedWindow("Source");
+        colors.push_back(Vec3b(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255)));
+    }
+
+    cout << colors.size() << endl;
+    
+    drawing = Mat(image.size(), CV_8UC3);
+    for (int i = 0; i < labels.rows; ++i)
+        for (int j = 0; j < labels.cols; ++j)
+            drawing.at<Vec3b>(i, j) = colors[labels.at<int>(i, j)];
+}
+
+int main(int argc, char** argv)
+{
+    int index = 0;
+    if (argc > 1)
+        index = atoi(argv[1]);
+
+    VideoCapture vc(index);
+
+    if (!vc.isOpened()) return 0;
+
+    Mat image, drawing;
+    vc >> image;
+
+    if (1)
+    {
         while (vc.isOpened())
         {
             vc >> image;
-            cvtColor(image, gray, CV_BGR2GRAY);
+            assignLabels(image, drawing);
 
-            imshow("Source", image);
+            imshow("Labels", drawing);
 
-            if (waitKey(20) == 27)
-                break;
+            waitKey(20);
+//            if (waitKey(20) == 27)
+//                break;
         }
     }
 }
