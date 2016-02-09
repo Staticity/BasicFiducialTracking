@@ -1,11 +1,17 @@
 #include <cv.h>
 #include <highgui.h>
+#include <imgproc/imgproc.hpp>
+#include <string>
 
 using namespace cv;
 
-int main()
+int main(int argc, char** argv)
 {
-    VideoCapture vc(0);
+    int index = 0;
+    if (argc > 1)
+        index = atoi(argv[1]);
+
+    VideoCapture vc(index);
     Mat image;
 
     if (!vc.isOpened()) return 0;
