@@ -14,7 +14,37 @@
 using namespace cv;
 using namespace std;
 
-bool find_black_quad(Mat image, vector<Point>& quad)
+bool poly_in_poly(const vector<Point>& container, const vector<Point>& query)
+{
+    for (int i = 0; i < query.size(); ++i)
+    {
+        if (pointPolygonTest(container, query[i], false) < -0.5f)
+            return false;
+    }
+
+    return true;
+}
+
+Point centroid(const vector<Point>& poly)
+{
+    Point2f center = Point2f(0, 0);
+    for (int i = 0; i < poly.size(); ++i)
+        center += Point2f(poly[i]);
+    return center / std::max(1, (int) poly.size());
+}
+
+void draw_poly(const Mat& im, const vector<Point>& poly, Scalar color)
+{
+    int n = poly.size();
+    for (int i = 0; i <n; ++ i)
+    {
+        int i1 = i % n;
+        int i2 = (i + 1) % n;
+        line(im, poly[i1], poly[i2], color, 2);
+    }
+}
+
+bool find_black_quad(Mat& image, vector<Point>& quad)
 {
     Mat gray;
     cvtColor(image, gray, CV_BGR2GRAY);
@@ -71,21 +101,51 @@ bool find_black_quad(Mat image, vector<Point>& quad)
         }
     }
 
-    float percent_black_acc = 0.90;
-    int min_size_acc = 500;
+    float percent_acceptance = 0.90;
+    int min_size_black_acc = 500;
+    int min_size_white_acc = min_size_black_acc / 10;
 
     vector<int> candidates_s1;
+    vector<int> white_candidates;
     for (int i = 0; i < labelCount; ++i)
     {
         int numPixels = points[i].size();
         float percent_black = ((float)blackCount[i]) / max(1, numPixels);
-        if (percent_black >= percent_black_acc && numPixels >= min_size_acc)
+        float percent_white = 1.0 - percent_black;
+
+        if (percent_black >= percent_acceptance)
         {
-            candidates_s1.push_back(i);
+            if (numPixels >= min_size_black_acc)
+                candidates_s1.push_back(i);
+        }
+        else if (percent_white >= percent_acceptance)
+        {
+            if (numPixels >= min_size_white_acc)
+                white_candidates.push_back(i);
         }
     }
 
+    float max_growth_percent = 1.001f;
+    vector<Point> white_poly_centroids;
+    for (int i = 0; i < white_candidates.size(); ++i)
+    {
+        int index = white_candidates[i];
 
+        vector<Point> hull;
+        convexHull(Mat(points[index]), hull, true);
+        int original_size = points[index].size();
+        float    new_size = contourArea(hull);
+
+        float inc_in_size = new_size / max(1, original_size);
+        if (inc_in_size > max_growth_percent)
+            continue;
+
+        approxPolyDP(hull, hull, 3, true);
+
+        white_poly_centroids.push_back(centroid(hull));
+    }
+
+    max_growth_percent = 2.0f;
     vector<int> candidates_s2;
     vector<vector<Point> > polys;
     for (int i = 0; i < candidates_s1.size(); ++i)
@@ -93,12 +153,33 @@ bool find_black_quad(Mat image, vector<Point>& quad)
         int index = candidates_s1[i];
         vector<Point> hull;
         convexHull(Mat(points[index]), hull, true);
+        int original_size = points[index].size();
+        float    new_size = contourArea(hull);
+
+        float inc_in_size = new_size / max(1, original_size);
+
+        if (inc_in_size > max_growth_percent)
+            continue;
+
         approxPolyDP(hull, hull, 3, true);
 
         if (hull.size() == 4)
         {
-            candidates_s2.push_back(index);
-            polys.push_back(hull);
+            bool contains_white_poly = false;
+            for (int j = 0; j < white_poly_centroids.size(); ++j)
+            {
+                if (pointPolygonTest(hull, white_poly_centroids[j], false) > -0.5f)
+                {
+                    contains_white_poly = true;
+                    break;
+                }
+            }
+
+            if (contains_white_poly)
+            {
+                candidates_s2.push_back(index);
+                polys.push_back(hull);
+            }
         }
     }
 
@@ -218,12 +299,7 @@ void draw_sorted_corners(Mat& image,
                          vector<Point>& quad,
                          Scalar line_color=Scalar(128, 128, 128))
 {
-    for (int i = 0; i < 4; ++ i)
-    {
-        int i1 = i % 4;
-        int i2 = (i + 1) % 4;
-        line(image, quad[i1], quad[i2], line_color, 2);
-    }
+    draw_poly(image, quad, line_color);
 
     Scalar colors[4] = 
     {
@@ -294,9 +370,9 @@ void draw_image_in_quad(Mat& image, vector<Point>& quad, const Mat& imposed)
     }
 }
 
-void draw_image_in_quad_rec(Mat& image, vector<Point>& quad, int its=2)
+void draw_image_in_quad_rec(Mat& image, vector<Point>& quad, int its=3)
 {
-    for (int i = 0; i < its; ++i)
+    for (int i = 1; i < its; ++i)
     {
         Mat image_clone = image.clone();
         draw_image_in_quad(image, quad, image_clone);
@@ -341,7 +417,7 @@ int main(int argc, char** argv)
                 {
                     // draw_sorted_corners(image, quad);
                     // draw_image_in_quad(image, quad, image.clone());
-                    draw_image_in_quad_rec(image, quad);
+                    draw_image_in_quad_rec(image, quad, 2);
                 }
             }
 
