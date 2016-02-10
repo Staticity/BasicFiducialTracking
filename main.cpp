@@ -488,24 +488,48 @@ void draw_cube_with_pose(Mat& image,
     }
 }
 
+// assumes no skew
+void update_camera_matrix_resize(Mat& camera_matrix, Size old_size, Size new_size)
+{
+    assert(old_size.width * new_size.height == old_size.height * new_size.width);
+    assert(old_size.width != 0 && old_size.height != 0);
+
+    double width_ratio = ((double) new_size.width) / old_size.width;
+    double height_ratio = ((double) new_size.height) / old_size.height;
+
+    camera_matrix.at<double>(0, 0) *= width_ratio;
+    camera_matrix.at<double>(1, 1) *= height_ratio;
+    camera_matrix.at<double>(0, 2) = new_size.width * 0.5;
+    camera_matrix.at<double>(1, 2) = new_size.height * 0.5;
+}
+
 int main(int argc, char** argv)
 {
     int index = 0;
     if (argc > 1)
         index = atoi(argv[1]);
 
-    string camera_calib_filename = "calibration_data/out_camera_data.xml";
+    string camera_calib_filename = "calibration_data/out_camera_data_1.xml";
     FileStorage fs(camera_calib_filename, FileStorage::READ);
 
     Mat camera_matrix, distortion_coeff;
+    int camera_width, camera_height;
     fs["camera_matrix"] >> camera_matrix;
     fs["distortion_coefficients"] >> distortion_coeff;
+    fs["image_width"] >> camera_width;
+    fs["image_height"] >> camera_height;
+
+    int width = 1280;
+    int height = 720;
+
+    update_camera_matrix_resize(
+        camera_matrix,
+        Size(camera_width, camera_height),
+        Size(width, height));
 
     fs.release();
 
     VideoCapture vc(index);
-    int width = 600;
-    int height = 480;
     vc.set(CV_CAP_PROP_FRAME_WIDTH, width);
     vc.set(CV_CAP_PROP_FRAME_HEIGHT, height);
 
@@ -514,6 +538,7 @@ int main(int argc, char** argv)
     Mat image;
     vc >> image;
 
+    namedWindow("outlined_source", CV_WINDOW_NORMAL);
     vector<Point> quad;
     while (vc.isOpened())
     {
@@ -530,18 +555,19 @@ int main(int argc, char** argv)
 
                 // draw_sorted_corners(image, quad);
                 // draw_image_in_quad(image, quad, image.clone());
-                draw_image_in_quad_rec(image, quad, 3);
+                // draw_image_in_quad_rec(image, quad, 3);
 
                 Mat rot, trans;
                 get_square_pose(quad, camera_matrix, distortion_coeff, rot, trans);
-                cout << "Rotation\n" << rot << endl;
-                cout << "Translation\n" << trans << endl << endl;
+                // cout << "Rotation\n" << rot << endl;
+                // cout << "Translation\n" << trans << endl << endl;
 
                 draw_cube_with_pose(image, rot, trans, camera_matrix, distortion_coeff);
             }
         }
 
-        // imshow("black_quad_outline", drawing);
+        // Mat resized_image;
+        // resize(image, resized_image, Size(width, height));
         imshow("outlined_source", image);
 
         if (waitKey(20) == 27)
