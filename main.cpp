@@ -58,6 +58,8 @@ bool find_black_quad(Mat& image, vector<Point>& quad)
         10
     );
 
+    // imshow("adapt", adapt);
+
     int erosion_size = 3;
     int square_size  = erosion_size * 2 + 1;
     Mat element = getStructuringElement(
@@ -67,6 +69,7 @@ bool find_black_quad(Mat& image, vector<Point>& quad)
     );
 
     erode(adapt, adapt, element);
+    // imshow("eroded", adapt);
 
     Mat labels;
     connectedComponents(adapt, labels, 4);
@@ -79,6 +82,8 @@ bool find_black_quad(Mat& image, vector<Point>& quad)
         255,
         THRESH_BINARY
     );
+
+    // imshow("thresh", thresh);
 
     double maxLabel;
     minMaxLoc(labels, NULL, &maxLabel);
@@ -141,9 +146,10 @@ bool find_black_quad(Mat& image, vector<Point>& quad)
         approxPolyDP(hull, hull, 3, true);
 
         white_poly_centroids.push_back(centroid(hull));
+        // circle(image, white_poly_centroids.back(), 10, Scalar(0, 255, 0), 2);
     }
 
-    max_growth_percent = 2.0f;
+    max_growth_percent = 1.25f;
     vector<int> candidates_s2;
     vector<vector<Point> > polys;
     for (int i = 0; i < candidates_s1.size(); ++i)
@@ -161,8 +167,10 @@ bool find_black_quad(Mat& image, vector<Point>& quad)
 
         approxPolyDP(hull, hull, 3, true);
 
+
         if (hull.size() == 4)
         {
+            // draw_poly(image, hull, Scalar(0, 0, 255));
             bool contains_white_poly = false;
             for (int j = 0; j < white_poly_centroids.size(); ++j)
             {
@@ -313,7 +321,7 @@ void draw_sorted_corners(Mat& image,
     }
 }
 
-void draw_image_in_quad(Mat& image, vector<Point>& quad, const Mat& imposed)
+Mat draw_image_in_quad(Mat& image, vector<Point>& quad, const Mat& imposed, Mat homography = Mat())
 {
     vector<Point> src_points;
     src_points.push_back(Point(0, 0));
@@ -321,7 +329,11 @@ void draw_image_in_quad(Mat& image, vector<Point>& quad, const Mat& imposed)
     src_points.push_back(Point(imposed.cols, imposed.rows));
     src_points.push_back(Point(0, imposed.rows));
 
-    Mat homography = findHomography(src_points, quad);
+    if (homography.rows == 0 || homography.cols == 0)
+    {
+        homography = findHomography(src_points, quad);
+    }
+
     Mat homography_inv = homography.inv();
     Rect r = boundingRect(quad);
 
@@ -366,14 +378,105 @@ void draw_image_in_quad(Mat& image, vector<Point>& quad, const Mat& imposed)
             }
         }
     }
+
+    return homography;
 }
 
-void draw_image_in_quad_rec(Mat& image, vector<Point>& quad, int its=3)
+// Kind of slow way to do it. Should update quad to represent new region
+void draw_image_in_quad_rec(Mat& image, vector<Point> quad, int its=3)
 {
+    assert(quad.size() == 4);
+
+    Mat homography = Mat();
     for (int i = 1; i < its; ++i)
     {
         Mat image_clone = image.clone();
-        draw_image_in_quad(image, quad, image_clone);
+        homography = draw_image_in_quad(image, quad, image_clone, homography);
+
+        for (int j = 0; j < quad.size(); ++j)
+        {
+            Mat p = Mat(3, 1, CV_64F);
+            p.at<double>(0, 0) = quad[j].x;
+            p.at<double>(1, 0) = quad[j].y;
+            p.at<double>(2, 0) = 1;
+
+            Mat q = homography * p;
+            float wx = q.at<double>(0, 0);
+            float wy = q.at<double>(1, 0);
+            float w  = q.at<double>(2, 0);
+
+            assert(w != 0.0);
+
+            quad[j] = Point(wx / w, wy / w);
+        }
+    }
+}
+
+void get_square_pose(const vector<Point>& quad, 
+                     const Mat& camera_matrix,
+                     const Mat& distortion_coeff,
+                     Mat& rot, Mat& trans)
+{
+    assert(quad.size() == 4);
+
+    double object_points[4][3] =
+    {
+        {-1.0,  1.0,  0.0f},
+        { 1.0,  1.0,  0.0f},
+        { 1.0, -1.0,  0.0f},
+        {-1.0, -1.0,  0.0f},
+    };
+
+    Mat object_mat = Mat(quad.size(), 3, CV_64F, object_points);
+    Mat quad_mat = Mat(quad.size(), 2, CV_64F);
+
+    for (int i = 0; i < quad.size(); ++i)
+    {
+        quad_mat.at<double>(i, 0) = quad[i].x;
+        quad_mat.at<double>(i, 1) = quad[i].y;
+    }
+
+    solvePnP(object_mat, quad_mat, camera_matrix, distortion_coeff, rot, trans);
+}
+
+void draw_cube_with_pose(Mat& image,
+                         const Mat& rot, const Mat& trans,
+                         const Mat& camera_matrix,
+                         const Mat& distortion_coeff)
+{
+    double cube_points[8][3] =
+    {
+        {-1.0,  1.0,  1.0},
+        {-1.0,  1.0, -1.0},
+        { 1.0,  1.0, -1.0},
+        { 1.0,  1.0,  1.0},
+        {-1.0, -1.0,  1.0},
+        {-1.0, -1.0, -1.0},
+        { 1.0, -1.0, -1.0},
+        { 1.0, -1.0,  1.0},
+    };
+
+    Mat cube_object_coordinates = Mat(8, 3, CV_64F, cube_points);
+
+    vector<Point> cube_projected_points;
+    projectPoints(
+        cube_object_coordinates,
+        rot,
+        trans,
+        camera_matrix,
+        distortion_coeff,
+        cube_projected_points);
+
+    Scalar color = Scalar(0, 255, 0);
+    for (int i = 0; i < 4; ++i)
+    {
+        int i1 = i;
+        int i2 = (i + 1) % 4;
+        int i3 = i1 + 4;
+        int i4 = i2 + 4;
+        line(image, cube_projected_points[i1], cube_projected_points[i2], color, 3);
+        line(image, cube_projected_points[i3], cube_projected_points[i4], color, 3);
+        line(image, cube_projected_points[i1], cube_projected_points[i3], color, 3);
     }
 }
 
@@ -382,6 +485,15 @@ int main(int argc, char** argv)
     int index = 0;
     if (argc > 1)
         index = atoi(argv[1]);
+
+    string camera_calib_filename = "calibration_data/out_camera_data_1.xml";
+    FileStorage fs(camera_calib_filename, FileStorage::READ);
+
+    Mat camera_matrix, distortion_coeff;
+    fs["camera_matrix"] >> camera_matrix;
+    fs["distortion_coefficients"] >> distortion_coeff;
+
+    fs.release();
 
     VideoCapture vc(index);
     int width = 600;
@@ -415,7 +527,14 @@ int main(int argc, char** argv)
                 {
                     // draw_sorted_corners(image, quad);
                     // draw_image_in_quad(image, quad, image.clone());
-                    draw_image_in_quad_rec(image, quad, 2);
+                    draw_image_in_quad_rec(image, quad, 3);
+
+                    Mat rot, trans;
+                    get_square_pose(quad, camera_matrix, distortion_coeff, rot, trans);
+                    cout << "Rotation\n" << rot << endl;
+                    cout << "Translation\n" << trans << endl << endl;
+
+                    draw_cube_with_pose(image, rot, trans, camera_matrix, distortion_coeff);
                 }
             }
 
