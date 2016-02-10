@@ -1,6 +1,4 @@
 #include <opencv.hpp>
-//#include <opencv/highgui/highgui.hpp>
-//#include <imgproc.hpp>
 
 #include <string>
 #include <iostream>
