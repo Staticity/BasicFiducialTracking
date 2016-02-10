@@ -11,7 +11,7 @@
 using namespace cv;
 using namespace std;
 
-void assignLabels(Mat image, Mat& drawing)
+bool find_black_quad(Mat image, vector<Point>& quad)
 {
     Mat gray;
     cvtColor(image, gray, CV_BGR2GRAY);
@@ -27,15 +27,6 @@ void assignLabels(Mat image, Mat& drawing)
         10
     );
 
-    Mat thresh;
-    threshold(
-        gray,
-        thresh,
-        80,
-        1,
-        THRESH_BINARY
-    );
-
     int erosion_size = 2;
     int square_size  = erosion_size * 2 + 1;
     Mat element = getStructuringElement(
@@ -49,15 +40,21 @@ void assignLabels(Mat image, Mat& drawing)
     Mat labels;
     connectedComponents(adapt, labels, 4);
 
+    Mat thresh;
+    threshold(
+        gray,
+        thresh,
+        100,
+        255,
+        THRESH_BINARY
+    );
+
     double maxLabel;
     minMaxLoc(labels, NULL, &maxLabel);
 
     int labelCount = (int)(maxLabel) + 1;
     vector<int> blackCount(labelCount);
-    vector<int>  numPixels(labelCount);
-
-    // for (int i = 0; i < labelCount; ++i)
-        // assert(blackCount[i] == 0 && numPixels[i] == 0);
+    vector<vector<Point> > points(labelCount);
 
     for (int i = 0; i < labels.rows; ++i)
     {
@@ -65,51 +62,68 @@ void assignLabels(Mat image, Mat& drawing)
         {
             int label        = labels.at<int>(i, j);
             int thresh_value = thresh.at<uchar>(i, j);
-            // assert(thresh_value == 0 || thresh_value == 1);
 
             blackCount[label] += thresh_value == 0;  
-            ++numPixels[label];
+            points[label].push_back(Point(j, i));
         }
     }
 
-
-    vector<int> candidates;
-    // vector<bool> is_candidate(labelCount);
     float percent_black_acc = 0.90;
-    int min_size_acc = 1000;
+    int min_size_acc = 500;
+
+    vector<int> candidates_s1;
     for (int i = 0; i < labelCount; ++i)
     {
-        float percent_black = ((float)blackCount[i]) / max(1, numPixels[i]);
-        if (percent_black >= percent_black_acc && numPixels[i] >= min_size_acc)
+        int numPixels = points[i].size();
+        float percent_black = ((float)blackCount[i]) / max(1, numPixels);
+        if (percent_black >= percent_black_acc && numPixels >= min_size_acc)
         {
-            candidates.push_back(i);
-            // is_candidate[i] = true;
+            candidates_s1.push_back(i);
         }
     }
 
-    int best_index = 0;
-    int best_size = 0;
-    for (int i = 0; i < candidates.size(); ++i)
+
+    vector<int> candidates_s2;
+    vector<vector<Point> > polys;
+    for (int i = 0; i < candidates_s1.size(); ++i)
     {
-        if (numPixels[candidates[i]] > best_size)
+        int index = candidates_s1[i];
+        vector<Point> hull;
+        convexHull(Mat(points[index]), hull, true);
+        approxPolyDP(hull, hull, 3, true);
+
+        if (hull.size() == 4)
         {
-            best_index = candidates[i];
-            best_size = numPixels[i];
+            candidates_s2.push_back(index);
+            polys.push_back(hull);
         }
     }
 
-    RNG rng(1234);
-    vector<Vec3b> colors(labelCount);
-    for (int i = 0; i < labelCount; ++i)
+    int best_index = -1;
+    int best_size = -1;
+    for (int i = 0; i < candidates_s2.size(); ++i)
     {
-        colors[i] = Vec3b(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+        int index = candidates_s2[i];
+        int numPixels = points[index].size();
+        if (numPixels > best_size)
+        {
+            best_index = i;
+            best_size = numPixels;
+        }
     }
+    
+    if (best_index == -1)
+        return false;
 
-    drawing = Mat::zeros(image.size(), CV_8UC3);
-    for (int i = 0; i < labels.rows; ++i)
-        for (int j = 0; j < labels.cols; ++j)
-            if (labels.at<int>(i, j) == best_index)
-                drawing.at<Vec3b>(i, j) = Vec3b(0, 255, 0);
+    quad = polys[best_index];
+
+    return true;
+}
+
+void sort_quad_corners(Mat image,
+                       const vector<Point>& quad,
+                       vector<Point>& sorted_quad)
+{
 
 }
 
@@ -120,25 +134,52 @@ int main(int argc, char** argv)
         index = atoi(argv[1]);
 
     VideoCapture vc(index);
+    int width = 640;
+    int height = 480;
+    vc.set(CV_CAP_PROP_FRAME_WIDTH, width);
+    vc.set(CV_CAP_PROP_FRAME_HEIGHT, height);
 
     if (!vc.isOpened()) return 0;
 
-    Mat image, drawing;
+    Mat image;
     vc >> image;
 
+    Mat drawing = Mat::zeros(image.size(), CV_8UC3);
+
+    vector<Point> quad;
     if (1)
     {
         while (vc.isOpened())
         {
             vc >> image;
-            assignLabels(image, drawing);
+            bool found = find_black_quad(image, quad);
 
-            imshow("Source", image);
-            imshow("Labels", drawing);
+            Scalar color;
+            if (!found)
+            {
+                color = Scalar(0, 0, 255);
+            }
+            else
+            {
+                color = Scalar(0, 255, 0);
+            }
 
-            waitKey(20);
-//            if (waitKey(20) == 27)
-//                break;
+            if (quad.size() == 4)
+            {
+                drawing = Mat::zeros(image.size(), CV_8UC3);
+                for (int i = 0; i <= 4; ++ i)
+                {
+                    int i1 = i % 4;
+                    int i2 = (i + 1) % 4;
+                    line(drawing, quad[i1], quad[i2], color);
+                }
+            }
+
+            imshow("black_quad_outline", drawing);
+            imshow("source_image", image);
+
+            if (waitKey(20) == 27)
+                break;
         }
     }
 }
