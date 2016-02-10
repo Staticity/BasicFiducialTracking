@@ -9,6 +9,7 @@
 #include <ctime>
 #include <utility>
 #include <assert.h>
+#include <cstdio>
 
 using namespace cv;
 using namespace std;
@@ -29,7 +30,7 @@ bool find_black_quad(Mat image, vector<Point>& quad)
         10
     );
 
-    int erosion_size = 2;
+    int erosion_size = 3;
     int square_size  = erosion_size * 2 + 1;
     Mat element = getStructuringElement(
         MORPH_RECT,
@@ -167,7 +168,7 @@ void sort_quad_corners(Mat& image,
     // center of white pixels
     white_centroid /= max(1, num_white_points);
 
-    circle(image, white_centroid, 5, Scalar(255, 0, 255));
+    // circle(image, white_centroid, 5, Scalar(255, 0, 255));
 
     // find quad corner closes to white centroid
     int white_corner_index = 0;
@@ -188,7 +189,7 @@ void sort_quad_corners(Mat& image,
     Point2f quad_centroid = (quad[0] + quad[1] + quad[2] + quad[3]) / 4.0f;
     vector<pair<double, int> > point_angle_tuples(4);
 
-    circle(image, quad_centroid, 5, Scalar(255, 255, 0));
+    // circle(image, quad_centroid, 5, Scalar(255, 255, 0));
 
     // sort points in clockwise order
     Point2f white_vector = Point2f(quad[white_corner_index]) - quad_centroid;
@@ -213,6 +214,95 @@ void sort_quad_corners(Mat& image,
     }
 }
 
+void draw_sorted_corners(Mat& image,
+                         vector<Point>& quad,
+                         Scalar line_color=Scalar(128, 128, 128))
+{
+    for (int i = 0; i < 4; ++ i)
+    {
+        int i1 = i % 4;
+        int i2 = (i + 1) % 4;
+        line(image, quad[i1], quad[i2], line_color, 2);
+    }
+
+    Scalar colors[4] = 
+    {
+        Scalar(0, 0, 255),
+        Scalar(0, 255, 0),
+        Scalar(255, 0, 0),
+        Scalar(255, 255, 255)
+    };
+
+    for (int i = 0; i < 4; ++i)
+    {
+        circle(image, quad[i], 7, colors[i], 2);
+    }
+}
+
+void draw_image_in_quad(Mat& image, vector<Point>& quad, const Mat& imposed)
+{
+    vector<Point> src_points;
+    src_points.push_back(Point(0, 0));
+    src_points.push_back(Point(imposed.cols, 0));
+    src_points.push_back(Point(imposed.cols, imposed.rows));
+    src_points.push_back(Point(0, imposed.rows));
+
+    Mat homography = findHomography(src_points, quad);
+    Mat homography_inv = homography.inv();
+    Rect r = boundingRect(quad);
+
+    for (int i = 0; i < r.height; ++i)
+    {
+        for (int j = 0; j < r.width; ++j)
+        {
+            int x = j + r.x;
+            int y = i + r.y;
+
+            // if (x, y) is in the quad
+            if (pointPolygonTest(quad, Point(x, y), false) > -0.5)
+            {
+                // lookup pixel value
+                // H * src == dest ->
+                // src ~= H^-1 * dest
+
+                Mat p = Mat::zeros(3, 1, CV_64F);
+                p.at<double>(0, 0) = x;
+                p.at<double>(1, 0) = y;
+                p.at<double>(2, 0) = 1;
+
+                Mat q = homography_inv * p;
+                double wx = q.at<double>(0, 0);
+                double wy = q.at<double>(1, 0);
+                double w  = q.at<double>(2, 0);
+
+                assert(w != 0.0f);
+
+                int qx = (int)(round(wx / w));
+                int qy = (int)(round(wy / w));
+
+                if (qx >= 0 && qy >= 0 && qx < imposed.cols && qy < imposed.rows)
+                {
+                    // printf("(%d, %d) -> (%d, %d)\n", y, x, qy, qx);
+                    image.at<Vec3b>(y, x) = imposed.at<Vec3b>(qy, qx);
+                }
+                else
+                {
+                    // cout << qx << ", " << qy << endl;
+                }
+            }
+        }
+    }
+}
+
+void draw_image_in_quad_rec(Mat& image, vector<Point>& quad, int its=2)
+{
+    for (int i = 0; i < its; ++i)
+    {
+        Mat image_clone = image.clone();
+        draw_image_in_quad(image, quad, image_clone);
+    }
+}
+
 int main(int argc, char** argv)
 {
     int index = 0;
@@ -220,7 +310,7 @@ int main(int argc, char** argv)
         index = atoi(argv[1]);
 
     VideoCapture vc(index);
-    int width = 640;
+    int width = 600;
     int height = 480;
     vc.set(CV_CAP_PROP_FRAME_WIDTH, width);
     vc.set(CV_CAP_PROP_FRAME_HEIGHT, height);
@@ -238,16 +328,6 @@ int main(int argc, char** argv)
             vc >> image;
             bool found = find_black_quad(image, quad);
 
-            Scalar color;
-            if (!found)
-            {
-                color = Scalar(0, 0, 255);
-            }
-            else
-            {
-                color = Scalar(128, 128, 128);
-            }
-
             if (quad.size() == 4)
             {
                 if (found)
@@ -257,24 +337,11 @@ int main(int argc, char** argv)
                     quad = sorted_quad;
                 }
 
-                for (int i = 0; i < 4; ++ i)
+                if (1 && found)
                 {
-                    int i1 = i % 4;
-                    int i2 = (i + 1) % 4;
-                    line(image, quad[i1], quad[i2], color, 2);
-                }
-
-                Scalar colors[4] = 
-                {
-                    Scalar(0, 0, 255),
-                    Scalar(0, 255, 0),
-                    Scalar(255, 0, 0),
-                    Scalar(255, 255, 255)
-                };
-
-                for (int i = 0; i < 4; ++i)
-                {
-                    circle(image, quad[i], 7, colors[i], 2);
+                    // draw_sorted_corners(image, quad);
+                    // draw_image_in_quad(image, quad, image.clone());
+                    draw_image_in_quad_rec(image, quad);
                 }
             }
 
