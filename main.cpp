@@ -446,27 +446,35 @@ void draw_cube_with_pose(Mat& image,
 {
     double cube_points[8][3] =
     {
-        {-1.0,  1.0,  1.0},
-        {-1.0,  1.0, -1.0},
-        { 1.0,  1.0, -1.0},
-        { 1.0,  1.0,  1.0},
-        {-1.0, -1.0,  1.0},
-        {-1.0, -1.0, -1.0},
-        { 1.0, -1.0, -1.0},
-        { 1.0, -1.0,  1.0},
+        {-1.0,  1.0,  0.0f},
+        { 1.0,  1.0,  0.0f},
+        { 1.0, -1.0,  0.0f},
+        {-1.0, -1.0,  0.0f},
+        {-1.0,  1.0,  1.0f},
+        { 1.0,  1.0,  1.0f},
+        { 1.0, -1.0,  1.0f},
+        {-1.0, -1.0,  1.0f},
     };
 
     Mat cube_object_coordinates = Mat(8, 3, CV_64F, cube_points);
 
-    vector<Point> cube_projected_points;
+    Mat projected_points;
     projectPoints(
         cube_object_coordinates,
         rot,
         trans,
         camera_matrix,
         distortion_coeff,
-        cube_projected_points);
+        projected_points);
 
+    vector<Point> cube_projected_points(8);
+    for (int i = 0; i < 8; ++i)
+    {
+        cube_projected_points[i] = Point2f(0.0, 0.0);
+        cube_projected_points[i].x = projected_points.at<double>(i, 0);
+        cube_projected_points[i].y = projected_points.at<double>(i, 1);
+    }
+    
     Scalar color = Scalar(0, 255, 0);
     for (int i = 0; i < 4; ++i)
     {
@@ -486,7 +494,7 @@ int main(int argc, char** argv)
     if (argc > 1)
         index = atoi(argv[1]);
 
-    string camera_calib_filename = "calibration_data/out_camera_data_1.xml";
+    string camera_calib_filename = "calibration_data/out_camera_data.xml";
     FileStorage fs(camera_calib_filename, FileStorage::READ);
 
     Mat camera_matrix, distortion_coeff;
@@ -507,42 +515,36 @@ int main(int argc, char** argv)
     vc >> image;
 
     vector<Point> quad;
-    if (1)
+    while (vc.isOpened())
     {
-        while (vc.isOpened())
+        vc >> image;
+        bool found = find_black_quad(image, quad);
+
+        if (quad.size() == 4)
         {
-            vc >> image;
-            bool found = find_black_quad(image, quad);
-
-            if (quad.size() == 4)
+            if (found)
             {
-                if (found)
-                {
-                    vector<Point> sorted_quad;
-                    sort_quad_corners(image, quad, sorted_quad);
-                    quad = sorted_quad;
-                }
+                vector<Point> sorted_quad;
+                sort_quad_corners(image, quad, sorted_quad);
+                quad = sorted_quad;
 
-                if (1 && found)
-                {
-                    // draw_sorted_corners(image, quad);
-                    // draw_image_in_quad(image, quad, image.clone());
-                    draw_image_in_quad_rec(image, quad, 3);
+                // draw_sorted_corners(image, quad);
+                // draw_image_in_quad(image, quad, image.clone());
+                draw_image_in_quad_rec(image, quad, 3);
 
-                    Mat rot, trans;
-                    get_square_pose(quad, camera_matrix, distortion_coeff, rot, trans);
-                    cout << "Rotation\n" << rot << endl;
-                    cout << "Translation\n" << trans << endl << endl;
+                Mat rot, trans;
+                get_square_pose(quad, camera_matrix, distortion_coeff, rot, trans);
+                cout << "Rotation\n" << rot << endl;
+                cout << "Translation\n" << trans << endl << endl;
 
-                    draw_cube_with_pose(image, rot, trans, camera_matrix, distortion_coeff);
-                }
+                draw_cube_with_pose(image, rot, trans, camera_matrix, distortion_coeff);
             }
-
-            // imshow("black_quad_outline", drawing);
-            imshow("outlined_source", image);
-
-            if (waitKey(20) == 27)
-                break;
         }
+
+        // imshow("black_quad_outline", drawing);
+        imshow("outlined_source", image);
+
+        if (waitKey(20) == 27)
+            break;
     }
 }
