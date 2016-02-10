@@ -5,7 +5,9 @@
 #include <string>
 #include <iostream>
 #include <map>
+#include <cmath>
 #include <ctime>
+#include <utility>
 #include <assert.h>
 
 using namespace cv;
@@ -120,11 +122,95 @@ bool find_black_quad(Mat image, vector<Point>& quad)
     return true;
 }
 
-void sort_quad_corners(Mat image,
+void sort_quad_corners(Mat& image,
                        const vector<Point>& quad,
                        vector<Point>& sorted_quad)
 {
+    assert(quad.size() == 4);
+    assert(&quad != &sorted_quad);
 
+    Mat gray;
+    cvtColor(image, gray, CV_BGR2GRAY);
+
+    Mat thresh;
+    threshold(
+        gray,
+        thresh,
+        155,
+        255,
+        THRESH_BINARY
+    );
+
+    Rect r = boundingRect(quad);
+    Point2f white_centroid = Point(0, 0);
+    int num_white_points = 0;
+    for (int i = 0; i < r.height; ++i)
+    {
+        for (int j = 0; j < r.width; ++j)
+        {
+            int x = j + r.x;
+            int y = i + r.y;
+
+            // if (x, y) is in the quad
+            if (pointPolygonTest(quad, Point(x, y), false) > -0.5)
+            {
+                if (thresh.at<uchar>(y, x) != 0)
+                {
+                    white_centroid.x += x;
+                    white_centroid.y += y;
+                    ++num_white_points;
+                }
+            }
+        }
+    }
+
+    // center of white pixels
+    white_centroid /= max(1, num_white_points);
+
+    circle(image, white_centroid, 5, Scalar(255, 0, 255));
+
+    // find quad corner closes to white centroid
+    int white_corner_index = 0;
+    float white_sq_distance = -1.0f;
+    for (int i = 0; i < 4; ++i)
+    {
+        Point2f dv = white_centroid - Point2f(quad[i]);
+        float sq_distance = dv.x * dv.x + dv.y * dv.y;
+        
+        if (sq_distance <= white_sq_distance ||
+            white_sq_distance < 0.0f)
+        {
+            white_corner_index = i;
+            white_sq_distance = sq_distance;
+        }
+    }
+
+    Point2f quad_centroid = (quad[0] + quad[1] + quad[2] + quad[3]) / 4.0f;
+    vector<pair<double, int> > point_angle_tuples(4);
+
+    circle(image, quad_centroid, 5, Scalar(255, 255, 0));
+
+    // sort points in clockwise order
+    Point2f white_vector = Point2f(quad[white_corner_index]) - quad_centroid;
+    for (int i = 0; i < 4; ++i)
+    {
+        Point2f corner_vector = Point2f(quad[i]) - quad_centroid;
+        double dot = white_vector.ddot(corner_vector);
+        double det = white_vector.cross(corner_vector);
+        double ang = atan2(det, dot);
+        while (ang < 0.0)
+            ang += 360.0;
+        point_angle_tuples[i] = make_pair(ang, i);
+    }
+
+    sort(point_angle_tuples.begin(), point_angle_tuples.end());
+
+    sorted_quad = vector<Point>(4);
+    for (int i = 0; i < 4; ++i)
+    {
+        int sorted_index = point_angle_tuples[i].second;
+        sorted_quad[i] = quad[sorted_index];
+    }
 }
 
 int main(int argc, char** argv)
@@ -144,8 +230,6 @@ int main(int argc, char** argv)
     Mat image;
     vc >> image;
 
-    Mat drawing = Mat::zeros(image.size(), CV_8UC3);
-
     vector<Point> quad;
     if (1)
     {
@@ -161,22 +245,41 @@ int main(int argc, char** argv)
             }
             else
             {
-                color = Scalar(0, 255, 0);
+                color = Scalar(128, 128, 128);
             }
 
             if (quad.size() == 4)
             {
-                drawing = Mat::zeros(image.size(), CV_8UC3);
-                for (int i = 0; i <= 4; ++ i)
+                if (found)
+                {
+                    vector<Point> sorted_quad;
+                    sort_quad_corners(image, quad, sorted_quad);
+                    quad = sorted_quad;
+                }
+
+                for (int i = 0; i < 4; ++ i)
                 {
                     int i1 = i % 4;
                     int i2 = (i + 1) % 4;
-                    line(drawing, quad[i1], quad[i2], color);
+                    line(image, quad[i1], quad[i2], color, 2);
+                }
+
+                Scalar colors[4] = 
+                {
+                    Scalar(0, 0, 255),
+                    Scalar(0, 255, 0),
+                    Scalar(255, 0, 0),
+                    Scalar(255, 255, 255)
+                };
+
+                for (int i = 0; i < 4; ++i)
+                {
+                    circle(image, quad[i], 7, colors[i], 2);
                 }
             }
 
-            imshow("black_quad_outline", drawing);
-            imshow("source_image", image);
+            // imshow("black_quad_outline", drawing);
+            imshow("outlined_source", image);
 
             if (waitKey(20) == 27)
                 break;
