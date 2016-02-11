@@ -23,7 +23,7 @@ main:
 	@$(CC) $(LFLAGS) main.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
 
 square_detect:
-	@$(CC) $(LFLAGS) main.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+	@$(CC) $(LFLAGS) square_detect.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
 
 camera_calibration:
 	@$(CC) $(LFLAGS) camera_calibration.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o camera_calibration.o
