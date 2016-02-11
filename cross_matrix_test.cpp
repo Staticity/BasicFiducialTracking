@@ -13,13 +13,13 @@ int main()
 
     Vec<double, 3> actual_cross = x1.cross(x2);
     assert(actual_cross[0] = x1[1] * x2[2] - x1[2] * x2[1]);
-    assert(actual_cross[1] = x1[0] * x2[2] - x1[2] * x2[0]);
+    assert(actual_cross[1] = x1[2] * x2[0] - x1[0] * x2[2]);
     assert(actual_cross[2] = x1[0] * x2[1] - x1[1] * x2[0]);
 
     double mat_data[3][3] =
     {
         {     0, -x1[2],   x1[1]},
-        {-x1[2],      0,   x1[0]},
+        { x1[2],      0,  -x1[0]},
         {-x1[1],  x1[0],       0},
     };
 
