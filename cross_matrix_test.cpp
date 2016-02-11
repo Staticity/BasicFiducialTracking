@@ -23,7 +23,6 @@ int main()
         {-x1[1],  x1[0],       0},
     };
 
-
     Mat mat_cross(3, 3, CV_64F, mat_data);
 
     cout << Mat(actual_cross) - mat_cross * Mat(x2) << endl;

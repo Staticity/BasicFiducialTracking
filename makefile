@@ -34,6 +34,9 @@ video_stream:
 cross_matrix_test:
 	@$(CC) $(LFLAGS) cross_matrix_test.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
 
+correspondences:
+	@$(CC) $(LFLAGS) correspondences.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+
 run:
 	@./main.o
 
