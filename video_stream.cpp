@@ -1,6 +1,4 @@
-#include <cv.h>
-#include <highgui.h>
-#include <imgproc/imgproc.hpp>
+#include <opencv.hpp>
 #include <string>
 
 using namespace cv;
