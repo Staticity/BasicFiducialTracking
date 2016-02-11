@@ -6,7 +6,7 @@
 
 ![Region detection](https://raw.github.com/Staticity/vision/master/images/square_detect/step_1.png)
 
-###2. Polygon detection(https://www.youtube.com/watch?v=ANfnv771plY)
+###2. Polygon detection (https://www.youtube.com/watch?v=ANfnv771plY)
 
 ![Polygon detection](https://raw.github.com/Staticity/vision/master/images/square_detect/step_2.png
 )
