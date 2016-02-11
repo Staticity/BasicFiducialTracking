@@ -1,6 +1,6 @@
 # Vision Projects
 
-##My first AR project in progress:
+##AR Cube + Mirror
 
 ###1. Region detection (https://www.youtube.com/watch?v=jrQmQiBMMtQ)
 
