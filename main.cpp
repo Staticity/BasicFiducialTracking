@@ -9,15 +9,16 @@ int main(int argc, char** argv)
     if (argc > 1)
         index = atoi(argv[1]);
 
-    int width = 1280;
-    int height = 720;
+    const int width = 1280;
+    const int height = 720;
     VideoCapture vc(index);
-    vc.set(CV_CAP_PROP_FRAME_WIDTH, width);
-    vc.set(CV_CAP_PROP_FRAME_HEIGHT, height);
-    
-    Mat image;
 
     if (!vc.isOpened()) return 0;
+    
+    vc.set(CV_CAP_PROP_FRAME_WIDTH, width);
+    vc.set(CV_CAP_PROP_FRAME_HEIGHT, height);
+
+    Mat image;
     vc >> image;
 
     namedWindow("test");
