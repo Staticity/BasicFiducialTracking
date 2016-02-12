@@ -38,14 +38,21 @@ cross_matrix_test:
 	@$(CC) $(LFLAGS) cross_matrix_test.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
 
 correspondences:
-	@$(CC) $(LFLAGS) correspondences.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+	@$(CC) $(LFLAGS) CameraData.cpp correspondences.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
 
 snap_pictures:
 	@$(CC) $(LFLAGS) snap_pictures.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+
+CameraData:
+	@$(CC) $(LFLAGS) CameraData.hpp CameraData.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
+
+Matcher:
+	@$(CC) $(LFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
 
 run:
 	@./main.o
 
 clean:
 	rm *.o
+	rm *.gch
 
