@@ -1,43 +1,41 @@
 #include <opencv.hpp>
+#include <xfeatures2d.hpp>
 
 #include <cstdio>
 #include <string>
 
+#define DEBUG false
+
+using namespace std;
 using namespace cv;
 
 struct CloudPoint
 {
     cv::Point3d pt;
-    cv::Point2d img_pt;
-    double reprojection_error;
+    cv::Point2d img_pt1, img_pt2;
 };
 
-double find_correspondences(const Mat& im1, const Mat& im2,
-                            std::vector<Point>& pts1, std::vector<Point>& pts2)
+void find_correspondences(const Mat& im1, const Mat& im2,
+                            vector<Point>& pts1, vector<Point>& pts2)
 {
-    // printf("=== [find_correspondences] ===\n");
-    double t = getTickCount();
-    // std::string feature_type  = "SIFT";
-    // std::string detector_type = "SIFT";
-    std::string matcher_type  = "BruteForce";
+    string matcher_type  = "BruteForce";
 
-    Ptr<FeatureDetector> detector = ORB::create();// FeatureDetector::create(feature_type);
-    std::vector<KeyPoint> feat1, feat2;
+    // double t = getTickCount();
+
+    Ptr<FeatureDetector> detector = xfeatures2d::SIFT::create();
+    vector<KeyPoint> feat1, feat2;
     detector->detect(im1, feat1);
     detector->detect(im2, feat2);
 
-    // printf("Num features: %lu, %lu\n", feat1.size(), feat2.size());
-
-    Ptr<DescriptorExtractor> extractor = ORB::create();// DescriptorExtractor::create(detector_type);
+    Ptr<DescriptorExtractor> extractor = xfeatures2d::SIFT::create();
     Mat descriptor1, descriptor2;
     extractor->compute(im1, feat1, descriptor1);
     extractor->compute(im2, feat2, descriptor2);
 
     Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create(matcher_type);
-    std::vector<std::vector<DMatch> > matches;
-    matcher->knnMatch(descriptor1, descriptor2, matches, 2);
 
-    // printf("Num matches: %lu\n", matches.size() * 2);
+    vector<vector<DMatch> > matches;
+    matcher->knnMatch(descriptor1, descriptor2, matches, 2);
 
     for (int i = 0; i < matches.size(); ++i)
     {
@@ -52,288 +50,255 @@ double find_correspondences(const Mat& im1, const Mat& im2,
         }
     }
 
-    double time_spent = (((double)getTickCount()) - t) / getTickFrequency();
+    // double time_spent = (((double)getTickCount()) - t) / getTickFrequency();
     // printf("[find_correspondences]: %0.4f seconds\n", time_spent);
-
+    
     return time_spent;
 }
 
-bool get_rotation_and_translation_from_e(Mat E,
-                                         std::vector<Mat>& rots,
-                                         std::vector<Mat>& trans)
+bool fequals(double a, double b, double eps=1e-09)
 {
-    SVD svd(E, SVD::MODIFY_A);
-
-    double s1 = svd.w.at<double>(0);
-    double s2 = svd.w.at<double>(1);
-
-    assert(s1 != 0.0 && s2 != 0.0);
-
-    double ratio_of_singular_values = fabs(s1 / s2);
-    if (ratio_of_singular_values > 1.0)
-        ratio_of_singular_values = 1.0 / ratio_of_singular_values;
-
-    const double max_percent_diff = 0.7;
-    if (ratio_of_singular_values < max_percent_diff)
-    {
-        printf("Singluar values of Essential matrix too far. Received %0.4f%% change.", ratio_of_singular_values);
-        printf("Singular values: %0.2f & %0.2f\n", s1, s2);
-        return false;
-    }
-
-    double w_data[3][3] =
-    {
-        { 0.0, -1.0,  0.0},
-        { 1.0,  0.0,  0.0},
-        { 0.0,  0.0,  1.0}
-    };
-
-    Mat W = Mat(3, 3, CV_64F, w_data);
-
-    rots.clear();
-    rots.push_back(svd.u *   W   * svd.vt);
-    rots.push_back(svd.u * W.t() * svd.vt);
-    trans.clear();
-    trans.push_back( svd.u.col(2));
-    trans.push_back(-svd.u.col(2));
-
-    return true;
+    return fabs(a - b) < eps;
 }
 
-bool get_rotation_and_translation(const std::vector<Point>& pts1,
-                                  const std::vector<Point>& pts2,
-                                  const Mat& camera_matrix_left,
-                                  const Mat& camera_matrix_right,
+bool get_rotation_and_translation(const vector<Point>& pts1,
+                                  const vector<Point>& pts2,
+                                  const Mat& camera_matrix1,
+                                  const Mat& camera_matrix2,
                                   const Mat& distortion_coeffs,
                                   Mat& rotation,
                                   Mat& translation,
-                                  std::vector<CloudPoint>& cloud)
+                                  vector<CloudPoint>& cloud)
 {
     assert(pts1.size() == pts2.size());
-    assert(camera_matrix_right.rows == 3);
-    assert(camera_matrix_left.rows == 3);
+    assert(camera_matrix2.rows == 3);
+    assert(camera_matrix1.rows == 3);
+    assert(camera_matrix2.cols == 3);
+    assert(camera_matrix1.cols == 3);
 
     int n_points = pts1.size();
-    std::vector<uchar> is_inlier(n_points);
+
+    if (n_points < 8)
+        return false;
+
+    vector<uchar> is_inlier(n_points);
     Mat F = findFundamentalMat(pts1, pts2, FM_RANSAC, 3., 0.99, is_inlier);
-    Mat E = camera_matrix_right.t() * F * camera_matrix_left;
+    Mat E = camera_matrix2.t() * F * camera_matrix1;
 
-    printf("FUCK YEAH\n");
+    Mat D = (Mat_<double>(3, 3) << 1,  0,  0,
+                                   0,  1,  0,
+                                   0,  0,  0);
 
-    float det_e = determinant(E);
-    if (fabs(det_e) > 1e-07)
-    {
-        printf("Expected approximately 0 determinant of E. Received: %0.2f\n", det_e);
-        return false;
-    }
+    Mat W = (Mat_<double>(3, 3) << 0, -1,  0,
+                                   1,  0,  0,
+                                   0,  0,  1);
 
-    std::vector<Mat> rots, trans;
-    if (!get_rotation_and_translation_from_e(E, rots, trans))
-        return false;
+    // Compute first SVD
+    SVD svd(E, SVD::MODIFY_A);
 
-    assert(rots.size() == 2 && trans.size() == 2);
+    // Update E to include W as its svd diagonal
+    E = svd.u * D * svd.vt;
 
-    double det_r1 = determinant(rots[0]);
-    if (fabs(det_r1 - 1.0f) < 1e-09)
+    svd = SVD(E , SVD::MODIFY_A);
+
+    // to be a "valid" essential matrix, we need the
+    // rotation vector to be 1, we can accomplish
+    // this by negating E and starting over.
+    Mat test_rotation = svd.u * W * svd.vt;
+    if (fequals(determinant(test_rotation), -1))
     {
         E = -E;
-        if (!get_rotation_and_translation_from_e(E, rots, trans))
-            return false;
-
-        assert(rots.size() == 2 && trans.size() == 2);
-        det_r1 = determinant(rots[0]);
+        svd = SVD(E , SVD::MODIFY_A);
     }
 
-    if (fabs(det_r1) - 1.0f > 1e-07)
-    {
-        printf("Invalid rotation matrix. Expected -1 or 1 determinant, received: %0.4f\n", det_r1);
-        return false;
-    }
+    vector<Mat> rotations, translations;
+    rotations.push_back(svd.u *   W   * svd.vt);
+    rotations.push_back(svd.u * W.t() * svd.vt);
+    translations.push_back( svd.u.col(2));
+    translations.push_back(-svd.u.col(2));
 
-    std::vector<Point> inlier_points1;
-    std::vector<Point> inlier_points2;
+    // Must have a proper rotation matrix
+    double rot_det = determinant(rotations[0]);
+    assert(fequals(rot_det, -1.0) || fequals(rot_det, 1.0));
+
+    // First two singular values must be equal
+    assert(fequals(svd.w.at<double>(0), svd.w.at<double>(1)));
+
+    // Strip out only the inliers
+    vector<Point2d> left_inliers, right_inliers;
+    vector<int> inlier_indices;
+
+    double err = 0.0;
     for (int i = 0; i < n_points; ++i)
     {
         if (is_inlier[i])
         {
-            inlier_points1.push_back(pts1[i]);
-            inlier_points2.push_back(pts2[i]);
+            left_inliers.push_back(pts1[i]);
+            right_inliers.push_back(pts2[i]);
+            inlier_indices.push_back(i);
+
+            if (DEBUG)
+            {
+                Mat x2 = (Mat_<double>(3, 1) << pts2[i].x, pts2[i].y, 1);
+                Mat x1 = (Mat_<double>(3, 1) << pts1[i].x, pts1[i].y, 1);
+                Mat dist = x2.t() * F * x1;
+                err += dist.at<double>(0);
+            }
         }
     }
-    printf("FUCK YEAH x2\n");
 
-    int n_inlier_points = inlier_points1.size();
-
-    Mat camera_matrix_left_inv = camera_matrix_left.inv();
-    Mat camera_matrix_right_inv = camera_matrix_right.inv();
-
-    double p_left_data[3][4] =
+    if (DEBUG)
     {
-        {1.0, 0.0, 0.0, 0.0},
-        {1.0, 0.0, 0.0, 0.0},
-        {1.0, 0.0, 0.0, 0.0},
-    };
+        err /= max((int)inlier_indices.size(), 1);
+        cout << "average error: " << err << endl;
+    }
 
-    double p_right_data[3][4] =
+    // Everything is pretty fuckin good up to this point
+
+    vector<Point2d> left_npc_pts, right_npc_pts;
+    undistortPoints(left_inliers ,  left_npc_pts, camera_matrix1, distortion_coeffs);
+    undistortPoints(right_inliers, right_npc_pts, camera_matrix2, distortion_coeffs);
+
+    if (DEBUG && 0)
     {
-        {0.0, 0.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 0.0},
-    };
+        for (int i = 0; i < left_npc_pts.size(); ++i)
+        {
+            cout << "Left: " << left_npc_pts[i] << " from " << left_inliers[i] << endl;
+            cout << "Right: " << right_npc_pts[i] << right_inliers[i] << endl;
+        }
+    }
 
-    Mat Pl = Mat(3, 4, CV_64F, p_left_data);
+    // // Kind of bad, but let's reset n_points
+    n_points = left_npc_pts.size();
 
-    // redundant assert for clarity
-    assert(rots.size() * trans.size() == 4);
-    std::vector<std::vector<CloudPoint> > clouds(4);
-    std::vector<double> reprojection_errors_max(4);
-    std::vector<bool> is_candidate(4);
+    // No rotation and no translation
+    Mat P1 = (Mat_<double>(3, 4) << 1, 0, 0, 0,
+                                    0, 1, 0, 0,
+                                    0, 0, 1, 0);
 
     int index = 0;
-    for (int i = 0; i < rots.size(); ++i)
+    int best_index = -1;
+    double best_percent = -1.0;
+    for (int i = 0; i < rotations.size(); ++i)
     {
-        for (int j = 0; j < trans.size(); ++j)
+        for (int j = 0; j < translations.size(); ++j)
         {
-            // printf("FUCK YEAH IN THE LOOP: %d, %d\n", i, j);
-            // store the projection matrices
-            for (int x = 0; x < 3; ++x)
-                for (int y = 0; y < 3; ++y)
-                    p_right_data[x][y] = rots[i].at<double>(x, y);
-            for (int x = 0; x < 3; ++x)
-                p_right_data[x][3] = trans[j].at<double>(x);
+            Mat P2 = Mat::zeros(3, 4, CV_64F);
+            rotations[i].copyTo(P2(Rect(0, 0, 3, 3)));
+            translations[j].copyTo(P2(Rect(3, 0, 1, 3)));
 
-            Mat Pr = Mat(3, 4, CV_64F, p_right_data);
-            // std::cout << Pr << std::endl;
-            // std::cout << "Rotation: " << rots[i] << std::endl;
-            // std::cout << "Translation: " << trans[j] << std::endl;
+            assert(P1.type() == CV_64F);
+            assert(P2.type() == CV_64F);
 
-            double in_front_left  = 0;
-            double in_front_right = 0;
+            Mat homogeneous_3d;
+            triangulatePoints(P1,
+                              P2,
+                              left_npc_pts,
+                              right_npc_pts,
+                              homogeneous_3d);
 
-            // Determine re-projection error
-            double total_error_left  = 0.0;
-            double total_error_right = 0.0;
-            for (int k = 0; k < n_inlier_points; ++k)
+            homogeneous_3d = homogeneous_3d.t();
+            assert(homogeneous_3d.type() == CV_64F);
+            assert(homogeneous_3d.rows == n_points);
+            assert(homogeneous_3d.cols == 4);
+            assert(homogeneous_3d.clone().checkVector(4) >= 0);
+
+            // Doesn't zero out when w = 0...
+            // vector<Point3d> points3d;
+            // convertPointsFromHomogeneous(homogeneous_3d, points3d);
+            // assert(points3d.size() == n_points);
+
+            vector<Point3d> points3d;
+            vector<int> point_indices;
+            int in_front = 0;
+            const Vec4d* pts4 = homogeneous_3d.ptr<Vec4d>();
+            for (int k = 0; k < n_points; ++k)
             {
-                // printf("HOLY SHIT I'M AT THAT %dth of %d INLIERS!!!\n", k, n_inlier_points);
-                double  left_x = inlier_points1[k].x;
-                double  left_y = inlier_points1[k].y;
-                double right_x = inlier_points2[k].x;
-                double right_y = inlier_points2[k].y;
+                double x = pts4[k][0];
+                double y = pts4[k][1];
+                double z = pts4[k][2];
+                double w = pts4[k][3];
+                double scale = 0.0;
 
-                Mat homog_left  = (Mat_<double>(3, 1) <<  left_x,  left_y, 1.0);
-                Mat homog_right = (Mat_<double>(3, 1) << right_x, right_y, 1.0);
+                if (!fequals(w, 0))
+                {
+                    scale = 1.0 / w;
+                    x *= scale;
+                    y *= scale;
+                    z *= scale;
 
-                std::cout << homog_left << std::endl;
-
-                Mat  left_3d = camera_matrix_left_inv  * homog_left;
-                Mat right_3d = camera_matrix_right_inv * homog_right;
-
-                in_front_left  += ( left_3d.at<double>(3) >= 0.0);
-                in_front_right += (right_3d.at<double>(3) >= 0.0);
-
-                // project points
-                double lx = left_3d.at<double>(0);
-                double ly = left_3d.at<double>(1);
-                double lz = left_3d.at<double>(2);
-
-                double rx = right_3d.at<double>(0);
-                double ry = right_3d.at<double>(1);
-                double rz = right_3d.at<double>(2);
-
-                Mat  homog_left_3d = (Mat_<double>(4, 1) << lx, ly, lz, 1.0);
-                Mat homog_right_3d = (Mat_<double>(4, 1) << rx, ry, rz, 1.0);
-
-                Mat  reprojected_left = camera_matrix_left  * Pl * homog_left_3d;
-                Mat reprojected_right = camera_matrix_right * Pr * homog_right_3d;
-
-                double xw_l = reprojected_left.at<double>(0);
-                double yw_l = reprojected_left.at<double>(1);
-                double w_l  = reprojected_left.at<double>(2);
-                assert(w_l != 0.0);
-
-                double xw_r = reprojected_right.at<double>(0);
-                double yw_r = reprojected_right.at<double>(1);
-                double w_r  = reprojected_right.at<double>(2);
-                assert(w_r != 0.0);
-
-                double x_l = xw_l / w_l;
-                double y_l = yw_l / w_l;
-
-                // printf("[%d] Left 2d point: %0.2f %0.2f\n", k, left_x, left_y);
-                // printf("[%d] Left 2d  proj: %0.2f %0.2f\n", k, x_l, y_l);
-                // printf("[%d] Left 3d point: %0.2f %0.2f %0.2f\n", k, lx, ly, lz);
-                // printf("\n");
-
-                double x_r = xw_r / w_r;
-                double y_r = yw_r / w_r;
-
-                double re_l = ( left_x - x_l) * ( left_x - x_l) + ( left_y - y_l) * ( left_y - y_l);
-                double re_r = (right_x - x_r) * (right_x - x_r) + (right_y - y_r) * (right_y - y_r);
-
-                total_error_left  += re_l;
-                total_error_right += re_r;
-
-                // printf("Did this fuck up? :(\n");
-
-                CloudPoint cloud_pt_left;
-                cloud_pt_left.pt = Point3d(left_3d);
-                cloud_pt_left.img_pt = Point2d(left_x, left_y);
-                cloud_pt_left.reprojection_error = re_l;
-
-                assert(index >= 0 && index < clouds.size());
-                // printf("Cloud size: %d of %lu", index, clouds.size());
-                clouds[index].push_back(cloud_pt_left);
-
-                /*
-                CloudPoint cloud_pt_right;
-                cloud_pt_right.pt = Point3d(right_3d);
-                cloud_pt_right.img_pt = Point2d(right_x, right_y);
-                cloud_pt_right.reprojection_error = re_r;
-                */
+                    points3d.push_back(Point3d(x, y, z));
+                    point_indices.push_back(inlier_indices[k]);
+                    in_front += z > 0.0;
+                }
             }
 
-            const double min_acc_in_front = 0.75;
-            const double percent_in_front_l = ((float) in_front_left) / n_inlier_points;
-            const double percent_in_front_r = ((float)in_front_right) / n_inlier_points;
-            reprojection_errors_max[index] = max(total_error_left, total_error_right);
+            const double min_in_front_percent = 0.75;
+            const double percent_in_front = ((double) in_front) / max(n_points, 1);
 
-            printf("left: %0.2f\tright:%0.2f\terror:%0.2f\n", percent_in_front_l, percent_in_front_r, reprojection_errors_max[index]);
-            is_candidate[index] = percent_in_front_l >= min_acc_in_front &&
-                                  percent_in_front_r >= min_acc_in_front &&
-                                  reprojection_errors_max[index] < 10e2;
+            if (percent_in_front >= min_in_front_percent)
+            {
+                Mat R = P1(Rect(0, 0, 3, 3));
+                Vec3d rvec(0, 0, 0); // Rodrigues identity rotation
+                Vec3d tvec(0, 0, 0); // no translation
+
+                vector<Point2d> reprojected_pts;
+                projectPoints(points3d,
+                              rvec,
+                              tvec,
+                              camera_matrix1,
+                              distortion_coeffs,
+                              reprojected_pts);
+
+                vector<Point2d> original_pts(reprojected_pts.size());
+                for (int k = 0; k < reprojected_pts.size(); ++k)
+                {
+                    original_pts[k] = pts1[point_indices[k]];
+                }
+
+                double avg_error = cv::norm(Mat(reprojected_pts), Mat(original_pts), NORM_L2) / max((double) reprojected_pts.size(), 1.0);
+
+                if (DEBUG)
+                    cout << avg_error << endl;
+
+                if (avg_error <= 10.0)
+                {
+                    if (percent_in_front > best_percent)
+                    {                        
+                        best_percent = percent_in_front;
+                        best_index = index;
+
+                        cloud = vector<CloudPoint>(reprojected_pts.size());
+                        for (int k = 0; k < reprojected_pts.size(); ++k)
+                        {
+                            int pt_index = point_indices[k];
+                            cloud[k].pt = points3d[k];
+                            cloud[k].img_pt1 = pts1[pt_index];
+                            cloud[k].img_pt2 = pts2[pt_index];
+
+                            if (DEBUG)
+                            {
+                                cout << k << " -> " << point_indices[k] << endl;
+                                cout << cloud[k].pt << endl;
+                                cout << cloud[k].img_pt1 << endl;
+                                cout << cloud[k].img_pt2 << endl << endl;
+                            }
+                        }
+                    }
+                }
+            }
 
             ++index;
+            if (DEBUG)
+                cout << in_front << " / " << n_points << endl;
         }
     }
 
-    int best_index = (is_candidate[0]) ? 0 : -1;
-    double min_error = reprojection_errors_max[0];
-    for (int i = 1; i < 4; ++i)
-    {
-        if (is_candidate[index])
-        {
-            if (reprojection_errors_max[i] < min_error)
-            {
-                best_index = i;
-                min_error = reprojection_errors_max[i];
-            }
-        }
-    }
 
-    // 0: R1 T1
-    // 1: R1 T2
-    // 2: R2 T1
-    // 3: R2 T1
-    // n: /2 %2
-    if (best_index != -1)
-    {
-        cloud       = clouds[best_index];
-        rotation    = rots[best_index / 2];
-        translation = trans[best_index % 2];
-    }
+    if (best_index == -1)
+        return false;
 
-    return best_index != -1;
+    return true;
 }
 
 // assumes no skew
@@ -357,13 +322,13 @@ int main(int argc, char** argv)
     if (argc > 1)
         index = atoi(argv[1]);
 
-    std::string camera_calib_filename = "calibration_data/out_camera_data_1.xml";
+    string camera_calib_filename = "calibration_data/out_camera_data.xml";
     FileStorage fs(camera_calib_filename, FileStorage::READ);
 
-    Mat camera_matrix, distortion_coeff;
+    Mat camera_matrix, distortion_coeffs;
     int camera_width, camera_height;
     fs["camera_matrix"] >> camera_matrix;
-    fs["distortion_coefficients"] >> distortion_coeff;
+    fs["distortion_coefficients"] >> distortion_coeffs;
     fs["image_width"] >> camera_width;
     fs["image_height"] >> camera_height;
 
@@ -383,43 +348,72 @@ int main(int argc, char** argv)
     vc.set(CV_CAP_PROP_FRAME_HEIGHT, height);
 
     Mat im1, im2;
-
-    namedWindow("im1");
-    namedWindow("im2");
-
     vc >> im1;
-    waitKey();
-    vc >> im2;
-    waitKey();
+    while (vc.isOpened())
+    {
+        vc >> im1;
+        imshow("im1", im1);
+        if (waitKey(20) == 27) break;
+    }
+    while (vc.isOpened())
+    {
+        vc >> im2;
+        imshow("im2", im2);
+        if (waitKey(20) == 27) break;
+    }
+    // Mat im1 = imread("test1.jpg");
+    // Mat im2 = imread("test2.jpg");
 
-    std::vector<Point> pts1, pts2;
+    vector<Point> pts1, pts2;
     find_correspondences(im1, im2, pts1, pts2);
     assert(pts1.size() == pts2.size());
 
+    
     Mat rotation, translation;
-    std::vector<CloudPoint> cloud;
+    vector<CloudPoint> cloud;
     bool found = get_rotation_and_translation(
         pts1,
         pts2,
         camera_matrix,
         camera_matrix,
-        distortion_coeff,
+        distortion_coeffs,
         rotation,
         translation,
         cloud);
 
-    printf("Found cloud: %d\n", found);
+    // printf("Found cloud: %d\n", found);
+    // cout << cloud.size() << endl;
+
+    imshow("left", im1);
+    RNG rng(0);
+    if (found)
+    {
+        for (int i = 0; i < cloud.size(); ++i)
+        {
+            Vec3b color = im1.at<Vec3b>(cloud[i].img_pt1.y, cloud[i].img_pt1.x);
+            printf("%f %f %f %d %d %d\n", cloud[i].pt.x, cloud[i].pt.y, cloud[i].pt.z,
+                                          color[0], color[1], color[2]);
+
+            // cout << cloud[i].img_pt1 << endl;
+            circle(im1, cloud[i].img_pt1, 5, Scalar(0, 255, 0), 3);
+        }
+    }
+    imshow("left", im1);
+    waitKey();
 
     if (0)
     {
-        RNG rng(0);
         int n = pts1.size();
-        for (int i = 0; i < n; ++i)
-        {
-            Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
-            circle(im1, pts1[i], 10, color, 3);
-            circle(im2, pts2[i], 10, color, 3);
-        }
+        // barf way to keep infliers lol
+        vector<uchar> is_inlier(n);
+        Mat F = findFundamentalMat(pts1, pts2, FM_RANSAC, 3., 0.99, is_inlier);
+
+        // for (int i = 0; i < n; ++i)
+        // {
+        //     Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+        //     circle(im1, pts1[i], 10, color, 3);
+        //     circle(im2, pts2[i], 10, color, 3);
+        // }
 
         Mat joined_image  = Mat::zeros(max(im1.rows, im2.rows), im1.cols + im2.cols, im1.type());
         Rect left_roi  = Rect(0, 0, im1.cols, im1.rows);
@@ -431,8 +425,17 @@ int main(int argc, char** argv)
         im1.copyTo(left_portion);
         im2.copyTo(right_portion);
 
-        imshow("im", joined_image);
-    }
+        for (int i = 0; i < n; ++i)
+        {
+            if (!is_inlier[i]) continue;
+            if (rng.uniform(1, 100) > 5) continue;
+            Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+            Point p1 = pts1[i];
+            Point p2 = pts2[i] + Point(im1.cols, 0);
+            line(joined_image, p1, p2, color, 2);
+        }
 
-    // waitKey();
+        imshow("im", joined_image);
+        waitKey();
+    }
 }

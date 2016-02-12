@@ -1,0 +1,9 @@
+*.jpg
+*.png
+*.JPG
+*.PNG
+*.jpeg
+*.JPEG
+*.o
+*.tmp
+.DS_STORE
