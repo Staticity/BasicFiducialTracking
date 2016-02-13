@@ -14,17 +14,17 @@ namespace cv
 class Matcher
 {
     Matcher();
-    ~Matcher();
+    virtual ~Matcher();
            
     virtual bool match(const cv::Mat&             img1,
                        const cv::Mat&             img2,
-                       std::vector<cv::DMatch>&   matches);
+                       std::vector<cv::DMatch>&   matches) const;
 
     virtual bool match(const cv::Mat&             img1,
                        const cv::Mat&             img2,
                        std::vector<cv::KeyPoint>& feat1,
                        std::vector<cv::KeyPoint>& feat2,
-                       std::vector<cv::DMatch>&   matches);
+                       std::vector<cv::DMatch>&   matches) const;
 
     virtual bool match(const cv::Mat&             img1,
                        const cv::Mat&             img2,
@@ -32,7 +32,7 @@ class Matcher
                        std::vector<cv::KeyPoint>& feat2,
                        cv::Mat&                   desc1,
                        cv::Mat&                   desc2,
-                       std::vector<cv::DMatch>&   matches) = 0;
+                       std::vector<cv::DMatch>&   matches) const = 0;
 };
 
 #endif

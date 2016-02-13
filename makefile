@@ -25,6 +25,9 @@ LIBRARIES   = -lopencv_calib3d     \
 main:
 	@$(CC) $(LFLAGS) main.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
 
+Util:
+	@$(CC) $(LFLAGS) Util.hpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
+
 square_detect:
 	@$(CC) $(LFLAGS) square_detect.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
 
@@ -48,6 +51,9 @@ CameraData:
 
 Matcher:
 	@$(CC) $(LFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
+
+VanillaTracker:
+	@$(CC) $(LFLAGS) CameraData.cpp Tracker.cpp VanillaTracker.hpp VanillaTracker.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
 
 run:
 	@./main.o

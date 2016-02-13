@@ -2,12 +2,7 @@
 #ifndef __CameraData_HPP__
 #define __CameraData_HPP__
 
-#include <opencv.hpp> //blegh
-
-// namespace cv
-// {
-//     struct Mat;
-// }
+#include <core.hpp>
 
 class CameraData
 {
@@ -26,4 +21,5 @@ public:
 
     void resize(const cv::Size& new_res);
 };
+
 #endif
