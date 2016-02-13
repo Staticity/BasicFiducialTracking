@@ -6,9 +6,9 @@ class Util
 {
 public:
     template<typename T>
-    static void keepByStatus(const std::vector<T>&                src,
-                             const std::vector<unsigned char>& status,
-                             std::vector<T>&                      dst);
+    static void mask(const std::vector<T>&              src,
+                     const std::vector<unsigned char>& mask,
+                     std::vector<T>&                    dst);
 
     static void toPoints(const std::vector<cv::KeyPoint>& keypoints,
                          std::vector<cv::Point>&             points);
@@ -18,9 +18,9 @@ public:
 };
 
 template<typename T>
-void Util::keepByStatus(const std::vector<T>&                src,
-                        const std::vector<unsigned char>& status,
-                        std::vector<T>&                      dst)
+void mask(const std::vector<T>&              src,
+          const std::vector<unsigned char>& mask,
+          std::vector<T>&                    dst)
 {
     for (int i = 0; i < src.size(); ++i)
         if (status[i])

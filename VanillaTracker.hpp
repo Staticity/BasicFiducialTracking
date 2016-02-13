@@ -18,10 +18,12 @@ private:
 
     struct Args
     {
-        std::vector<cv::Mat>   rotations;
-        std::vector<cv::Mat>   translations;
-        std::vector<cv::Point> undistortedPts1;
-        std::vector<cv::Point> undistortedPts2;
+        std::vector<cv::KeyPoint> inliers1;
+        std::vector<cv::KeyPoint> inliers2;
+        std::vector<cv::Mat>      rotations;
+        std::vector<cv::Mat>      translations;
+        std::vector<cv::Point>    undistortedPts1;
+        std::vector<cv::Point>    undistortedPts2;
     };
 
     bool _computeFundamental(const Input& in, Args& args, Tracker::Output& out) const;

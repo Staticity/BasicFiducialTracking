@@ -45,7 +45,61 @@ bool VanillaTracker::_computeFundamental(const Input& in, Args& args, Output& ou
 
 bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out) const
 {
-    return false;
+    static Mat D = (Mat_<double>(3, 3) << 1,  0,  0,
+                                          0,  1,  0,
+                                          0,  0,  0);
+
+    static Mat W = (Mat_<double>(3, 3) << 0, -1,  0,
+                                          1,  0,  0,
+                                          0,  0,  1);
+
+    // Assume same camera
+    Mat camera_matrix = in.camera.matrix();
+    out.essential = camera_matrix.t() * out.fundamental * camera_matrix;
+    
+    // Compute essential matrix and its SVD decomp,
+    // as well as the expected rotations and translations.
+    // TODO: Make assertions return false with error message?
+    {
+        SVD svd(E, SVD::MODIFY_A);
+        out.essential = svd.u * D * svd.vt; // Recompute E with D diagonal
+
+        svd = SVD(out.essential , SVD::MODIFY_A);
+
+        // to be a "valid" essential matrix, we need the
+        // rotation vector to be 1, we can accomplish
+        // this by negating E and starting over.
+        Mat test_rotation = svd.u * W * svd.vt;
+        if (Util::feq(determinant(test_rotation), -1.0))
+        {
+            out.essential = -out.essential;
+            svd = SVD(out.essential , SVD::MODIFY_A);
+        }
+
+        Mat r1 =  svd.u *   W   * svd.vt;
+        Mat r2 =  svd.u * W.t() * svd.vt;
+        Mat t1 =  svd.u.col(2);
+        Mat t2 = -svd.u.col(2);
+
+        args.rotations.push_back(r1);
+        args.rotations.push_back(r2);
+        args.translations.push_back(t1);
+        args.translations.push_back(t2);
+
+        // Must have a proper rotation matrix with 1 determinant
+        assert(fequals(determinant(rotations[0]), 1.0));
+
+        // First two singular values must be equal
+        assert(fequals(svd.w.at<double>(0), svd.w.at<double>(1)));
+    }
+
+    // Keep inliers.
+    {
+        Util::mask(in.feat1, args.mask, args.inliers1);
+        Util::mask(in.feat2, args.mask, args.inliers2);
+    }
+
+    return true;
 }
 
 bool VanillaTracker::_undistortPoints(const Input& in, Args& args, Output& out) const
