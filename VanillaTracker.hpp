@@ -17,10 +17,12 @@ private:
 
     struct Args
     {
-        std::vector<unsigned char> mask;
+        std::vector<uchar> mask;
         std::vector<int>           indices;
-        std::vector<cv::KeyPoint>  inliers1;
-        std::vector<cv::KeyPoint>  inliers2;
+        // std::vector<cv::KeyPoint>  inliers1;
+        // std::vector<cv::KeyPoint>  inliers2;
+        std::vector<cv::Point2d>   inliers1;
+        std::vector<cv::Point2d>   inliers2;
         std::vector<cv::Mat>       rotations;
         std::vector<cv::Mat>       translations;
         std::vector<cv::Point2d>   undistortedPts1;

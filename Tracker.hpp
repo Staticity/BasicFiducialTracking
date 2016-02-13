@@ -22,9 +22,13 @@ public:
 
     struct Input
     {
-        std::vector<cv::KeyPoint>  feat1;
-        std::vector<cv::KeyPoint>  feat2;
-        std::vector<cv::DMatch>    matches;
+        Input(CameraData cam) : camera(cam)
+        {}
+        // std::vector<cv::KeyPoint>  feat1;
+        // std::vector<cv::KeyPoint>  feat2;
+        // std::vector<cv::DMatch>    matches;
+        std::vector<cv::Point2d>   pts1;
+        std::vector<cv::Point2d>   pts2;
         CameraData                 camera;
     };
 

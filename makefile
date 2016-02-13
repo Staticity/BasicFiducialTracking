@@ -29,6 +29,12 @@ run.o: clean main.o
 main.o: CameraData.o VanillaTracker.o VanillaMatcher.o
 	$(CC) $(CFLAGS) main.cpp $(INCLUDE_DIR)
 
+correspondences.o: CameraData.o misc/correspondences.cpp
+	$(CC) $(LFLAGS) misc/correspondences.cpp CameraData.o -o correspondences.o $(INCLUDE_DIR) $(LIBRARIES)
+
+square_detect.o: misc/square_detect.cpp
+	$(CC) $(LFLAGS) misc/square_detect.cpp -o square_detect.o $(INCLUDE_DIR) $(LIBRARIES)
+
 Util.o:
 	$(CC) $(CFLAGS) Util.hpp $(INCLUDE_DIR)
 
@@ -46,9 +52,6 @@ Matcher.o: Matcher.cpp
 
 CameraData.o: CameraData.cpp
 	$(CC) $(CFLAGS) CameraData.hpp CameraData.cpp $(INCLUDE_DIR)
-
-square_detect.o: misc/square_detect.cpp
-	$(CC) $(LFLAGS) misc/square_detect.cpp -o square_detect.o $(INCLUDE_DIR) $(LIBRARIES)
 
 clean:
 	rm -f *.o

@@ -32,9 +32,9 @@ bool VanillaMatcher::match(const cv::Mat&             img1,
 
     if (do_feat1 || do_feat2)
     {
-        cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SURF::create(400);
+        // cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SURF::create(400);
         // cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SIFT::create();
-        // cv::Ptr<cv::FeatureDetector> detector = cv::FastFeatureDetector::create(20);
+        cv::Ptr<cv::FeatureDetector> detector = cv::FastFeatureDetector::create(20);
         // cv::Ptr<cv::FeatureDetector> detector = cv::BRISK::create();
 
         if (do_feat1) detector->detect(img1, feat1);

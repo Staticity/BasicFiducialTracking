@@ -129,7 +129,7 @@ bool get_rotation_and_translation(const vector<Point2d>& pts1,
         printf("Okay, we're going somewhere\n");
 
     vector<uchar> is_inlier(n_points);
-    Mat F = findFundamentalMat(pts1, pts2, FM_RANSAC, 3., 0.99, is_inlier);
+    Mat F = findFundamentalMat(pts1, pts2, FM_RANSAC, 3.0, 0.99, is_inlier);
 
     if (F.rows == 0 || F.cols == 0)
         return false;

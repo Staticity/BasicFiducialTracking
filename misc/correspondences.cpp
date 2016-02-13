@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <iostream>
 
-#include "CameraData.hpp"
+#include "../CameraData.hpp"
 
 using namespace std;
 using namespace cv;

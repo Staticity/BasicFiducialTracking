@@ -4,6 +4,7 @@
 #include <imgproc.hpp>
 
 #include <assert.h>
+#include <iostream>
 
 #include "Util.hpp"
 
@@ -12,7 +13,7 @@ VanillaTracker::~VanillaTracker() {}
 
 bool VanillaTracker::triangulate(const Input& in, Output& out) const
 {
-    assert(in.feat1.size() == in.feat1.size());
+    assert(in.pts1.size() == in.pts2.size());
     assert(in.camera.matrix().size() == cv::Size(3, 3));
 
     Args args;
@@ -28,31 +29,29 @@ bool VanillaTracker::triangulate(const Input& in, Output& out) const
 
 bool VanillaTracker::_computeFundamental(const Input& in, Args& args, Output& out) const
 {
-    int num_points = in.feat1.size();
+    static int min_inliers = 100;
+    int num_points = in.pts1.size();
 
-    if (num_points < 8) return false;
+    args.mask = std::vector<uchar>(num_points);
+    out.fundamental = findFundamentalMat(in.pts1, in.pts2, cv::FM_RANSAC, 3.0, 0.99, args.mask);
 
-    std::vector<cv::Point2d> pts1, pts2;
-    Util::toPoints(in.feat1, pts1);
-    Util::toPoints(in.feat2, pts2);
+    num_points = cv::countNonZero(args.mask);
 
-    args.mask = std::vector<unsigned char>(num_points);
-    out.fundamental = findFundamentalMat(pts1, pts2, cv::FM_RANSAC, 3., 0.99, args.mask);
-
+    if (num_points < min_inliers) return false;
     if (out.fundamental.empty()) return false;
 
-    return false;
+    return true;
 }
 
 bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out) const
 {
-    static cv::Mat D = (cv::Mat_<double>(3, 3) << 1,  0,  0,
-                                                  0,  1,  0,
-                                                  0,  0,  0);
+    static cv::Mat D = (cv::Mat_<double>(3, 3) << 1.0,  0.0,  0.0,
+                                                  0.0,  1.0,  0.0,
+                                                  0.0,  0.0,  0.0);
 
-    static cv::Mat W = (cv::Mat_<double>(3, 3) << 0, -1,  0,
-                                                  1,  0,  0,
-                                                  0,  0,  1);
+    static cv::Mat W = (cv::Mat_<double>(3, 3) << 0.0, -1.0,  0.0,
+                                                  1.0,  0.0,  0.0,
+                                                  0.0,  0.0,  1.0);
 
     // Assume same camera
     cv::Mat camera_matrix = in.camera.matrix();
@@ -75,8 +74,12 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
         cv::Mat test_rotation = svd.u * W * svd.vt;
         if (Util::feq(cv::determinant(test_rotation), -1.0))
         {
-            out.essential = -out.essential;
-            svd = cv::SVD(out.essential , cv::SVD::MODIFY_A);
+            // NOTE:
+            // This doesn't always work for some reason...
+            // Sometimes we still get a rotation with -1
+            // out.essential = -out.essential;
+            // svd = cv::SVD(out.essential , cv::SVD::MODIFY_A);
+            svd.vt.row(2) = -svd.vt.row(2);
         }
 
         cv::Mat r1 =  svd.u *   W   * svd.vt;
@@ -96,18 +99,18 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
         assert(svd.w.type() == CV_64F);
         assert(Util::feq(svd.w.at<double>(0), svd.w.at<double>(1)));
 
-        out.essentialU = svd.u;
-        out.essentialW = svd.w;
+        out.essentialU  = svd.u;
+        out.essentialW  = svd.w;
         out.essentialVt = svd.vt;
 
         // Keep inliers.
-        std::vector<int> indices(in.feat1.size());
+        std::vector<int> indices(in.pts1.size());
         for (int i = 0; i < indices.size(); ++i)
             indices[i] = i;
 
-        Util::retain(indices , args.mask, args.indices );
-        Util::retain(in.feat1, args.mask, args.inliers1);
-        Util::retain(in.feat2, args.mask, args.inliers2);
+        Util::retain(indices, args.mask, args.indices );
+        Util::retain(in.pts1, args.mask, args.inliers1);
+        Util::retain(in.pts2, args.mask, args.inliers2);
     }
 
     return true;
@@ -115,12 +118,8 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
 
 bool VanillaTracker::_undistortPoints(const Input& in, Args& args, Output& out) const
 {
-    std::vector<cv::Point2d> pts1, pts2;
-    Util::toPoints(args.inliers1, pts1);
-    Util::toPoints(args.inliers2, pts2);
-
-    cv::undistortPoints(pts1, args.undistortedPts1, in.camera.matrix(), in.camera.distortion());
-    cv::undistortPoints(pts2, args.undistortedPts2, in.camera.matrix(), in.camera.distortion());
+    cv::undistortPoints(args.inliers1, args.undistortedPts1, in.camera.matrix(), in.camera.distortion());
+    cv::undistortPoints(args.inliers2, args.undistortedPts2, in.camera.matrix(), in.camera.distortion());
 
     return true;
 }
@@ -140,25 +139,32 @@ bool VanillaTracker::_triangulate(const Input& in, Args& args, Output& out) cons
 
     for (int i = 0; i < args.rotations.size(); ++i)
     {
+        cv::Mat rotation    = args.rotations[i];
         for (int j = 0; j < args.translations.size(); ++j)
         {
-            cv::Mat rotation    = args.rotations[i];
-            cv::Mat translation = args.translations[i];
+            cv::Mat translation = args.translations[j];
 
             cv::Mat P2 = cv::Mat::zeros(3, 4, P1.type());
             rotation.copyTo(P2(RotationROI));
             translation.copyTo(P2(TranslationROI));
 
-            cv::Mat pts_homog_3d, pts_3d;
+            cv::Mat pts_homog_3d;
+            std::vector<cv::Point3d> pts_3d;
             cv::triangulatePoints(P1, P2, args.undistortedPts1, args.undistortedPts2, pts_homog_3d);
             cv::convertPointsFromHomogeneous(pts_homog_3d.t(), pts_3d);
 
+            // NOTE:
+            // This assumes that no points have w = 0, since
+            // as of 2/13/2016 convertPointsFromHomogenous
+            // doesn't zero out the vector if w = 0.
             std::vector<unsigned char> status(num_points);
             for (int k = 0; k < num_points; ++k)
-                status[k] = (pts_3d.at<double>(k, 2) > 0.0);
+            {
+                status[k] = (pts_3d[k].z > 0.0);
+            }
 
             int num_in_front  = cv::countNonZero(status);
-            int front_percent = ((double)(num_in_front)) / std::max(1, num_points);
+            double front_percent = ((double)(num_in_front)) / std::max(1, num_points);
 
             // Not enough points in front
             if (front_percent < min_percent) continue;
@@ -168,17 +174,14 @@ bool VanillaTracker::_triangulate(const Input& in, Args& args, Output& out) cons
             std::vector<cv::Point2d> reprojected_pts1;
             cv::projectPoints(pts_3d, rvec, tvec, in.camera.matrix(), in.camera.distortion(), reprojected_pts1);
 
-            std::vector<cv::Point2d> original_pts1;
-            Util::toPoints(args.inliers1, original_pts1);
-
-            const double error_total = cv::norm(cv::Mat(reprojected_pts1), cv::Mat(original_pts1), cv::NORM_L2); 
+            const double error_total = cv::norm(cv::Mat(reprojected_pts1), cv::Mat(args.inliers1), cv::NORM_L2); 
             const double error_avg   = error_total / std::max((int)reprojected_pts1.size(), 1);
 
             if (error_avg > min_error) continue;
 
             for (int k = 0; k < num_points; ++k)
             {
-                const double error = cv::norm(original_pts1[k] - reprojected_pts1[k]);
+                const double error = cv::norm(args.inliers1[k] - reprojected_pts1[k]);
                 status[k] &= (error < 2 * min_error);
             }
 
@@ -188,14 +191,14 @@ bool VanillaTracker::_triangulate(const Input& in, Args& args, Output& out) cons
             out.avg_reprojection_error = error_avg;
 
             out.points.clear();
-            const cv::Point3d* points_3d = pts_3d.ptr<cv::Point3d>();
             for (int k = 0; k < num_points; ++k)
             {
                 if (status[k])
                 {
                     out.points.push_back(CloudPoint());
-                    out.points[k].pt = cv::Point3d(points_3d[k]);
-                    out.points[k].index = args.indices[k];
+                    int out_index = out.points.size() - 1;
+                    out.points[out_index].pt = pts_3d[k];
+                    out.points[out_index].index = args.indices[k];
                 }
             }
 
