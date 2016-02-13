@@ -16,21 +16,20 @@ public:
 
     struct CloudPoint
     {
-        cv::Point3f pt;
+        cv::Point3d pt;
         int index;
     };
 
     struct Input
     {
-        const std::vector<cv::KeyPoint> feat1;
-        const std::vector<cv::KeyPoint> feat2;
-        const CameraData               camera;
+        std::vector<cv::KeyPoint>  feat1;
+        std::vector<cv::KeyPoint>  feat2;
+        std::vector<cv::DMatch>    matches;
+        CameraData                 camera;
     };
 
     struct Output
-    {
-        std::vector<unsigned char> mask;
-        
+    {        
         cv::Mat                    fundamental;
         cv::Mat                    essential;
         cv::Mat                    essentialU;

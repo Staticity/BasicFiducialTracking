@@ -53,7 +53,7 @@ Matcher:
 	@$(CC) $(LFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
 
 VanillaTracker:
-	@$(CC) $(LFLAGS) CameraData.cpp Tracker.cpp VanillaTracker.hpp VanillaTracker.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
+	@$(CC) $(LFLAGS) CameraData.cpp Util.hpp Tracker.cpp VanillaTracker.hpp VanillaTracker.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
 
 run:
 	@./main.o
