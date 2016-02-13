@@ -509,7 +509,7 @@ int main(int argc, char** argv)
     if (argc > 1)
         index = atoi(argv[1]);
 
-    string camera_calib_filename = "../calibration_data/out_camera_data_1.xml";
+    string camera_calib_filename = "calibration_data/out_camera_data.xml";
     FileStorage fs(camera_calib_filename, FileStorage::READ);
 
     Mat camera_matrix, distortion_coeff;
@@ -518,6 +518,8 @@ int main(int argc, char** argv)
     fs["distortion_coefficients"] >> distortion_coeff;
     fs["image_width"] >> camera_width;
     fs["image_height"] >> camera_height;
+
+    std::cout << camera_height << " " << camera_width << std::endl;
 
     int width = 1280;
     int height = 720;

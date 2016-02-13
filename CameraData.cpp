@@ -1,5 +1,6 @@
 #include "CameraData.hpp"
 
+#include <string>
 #include <assert.h>
 
 CameraData::CameraData(const std::string& calibration_data_path)

@@ -7,8 +7,8 @@
 namespace cv
 {
     class Mat;
-    struct KeyPoint;
-    struct DMatch;
+    class KeyPoint;
+    class DMatch;
 }
 
 class Matcher

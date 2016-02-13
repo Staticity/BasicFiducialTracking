@@ -29,11 +29,11 @@ private:
 
     bool _computeFundamental(const Input& in, Args& args, Tracker::Output& out) const;
 
-    bool _computeEssential(const Input& in, Args& args, Tracker::Output& out) const;
+    bool   _computeEssential(const Input& in, Args& args, Tracker::Output& out) const;
 
-    bool _undistortPoints(const Input& in, Args& args, Tracker::Output& out) const;
+    bool    _undistortPoints(const Input& in, Args& args, Tracker::Output& out) const;
 
-    bool _triangulate(const Input& in, Args& args, Tracker::Output& out) const;
+    bool        _triangulate(const Input& in, Args& args, Tracker::Output& out) const;
 
 };
 

@@ -6,6 +6,7 @@
 
 class VanillaMatcher : public Matcher
 {
+public:
     VanillaMatcher();
     virtual ~VanillaMatcher();
 

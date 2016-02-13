@@ -1,8 +1,8 @@
-CC          = g++
-CFLAGS      = -Wall -c $(DEBUG) -O3
-LFLAGS      = -Wall $(DEBUG)
+CC          = c++
+LFLAGS      = 
+CFLAGS      = -c 
+OBJS        =  Util.o CameraData.o Tracker.o Matcher.o VanillaTracker.o VanillaMatcher.o main.o
 INCLUDE_DIR = -I/usr/local/include/opencv -I/usr/local/include/opencv2
-LIBRARY_DIR = -L/usr/local/lib
 LIBRARIES   = -lopencv_calib3d     \
               -lopencv_core        \
               -lopencv_features2d  \
@@ -22,49 +22,35 @@ LIBRARIES   = -lopencv_calib3d     \
               -lopencv_videostab   \
               -lopencv_xfeatures2d
 
-main:
-	@$(CC) $(LFLAGS) main.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
 
-Util:
-	@$(CC) $(LFLAGS) Util.hpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
+run.o: clean main.o
+	$(CC) $(LFLAGS) *.o -o run.o $(INCLUDE_DIR) $(LIBRARIES)
 
-square_detect:
-	@$(CC) $(LFLAGS) square_detect.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+main.o: CameraData.o VanillaTracker.o VanillaMatcher.o
+	$(CC) $(CFLAGS) main.cpp $(INCLUDE_DIR)
 
-camera_calibration:
-	@$(CC) $(LFLAGS) camera_calibration.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+Util.o:
+	$(CC) $(CFLAGS) Util.hpp $(INCLUDE_DIR)
 
-video_stream:
-	@$(CC) $(LFLAGS) video_stream.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+VanillaTracker.o: Util.o Tracker.o VanillaTracker.cpp
+	$(CC) $(CFLAGS) VanillaTracker.hpp VanillaTracker.cpp $(INCLUDE_DIR)
 
-cross_matrix_test:
-	@$(CC) $(LFLAGS) cross_matrix_test.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+Tracker.o: CameraData.o Tracker.cpp
+	$(CC) $(CFLAGS) Tracker.hpp Tracker.cpp $(INCLUDE_DIR)
 
-correspondences:
-	@$(CC) $(LFLAGS) CameraData.cpp correspondences.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+VanillaMatcher.o: Matcher.o VanillaMatcher.cpp
+	$(CC) $(CFLAGS) VanillaMatcher.hpp VanillaMatcher.cpp $(INCLUDE_DIR)
+    
+Matcher.o: Matcher.cpp
+	$(CC) $(CFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR)
 
-snap_pictures:
-	@$(CC) $(LFLAGS) snap_pictures.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES) -o main.o
+CameraData.o: CameraData.cpp
+	$(CC) $(CFLAGS) CameraData.hpp CameraData.cpp $(INCLUDE_DIR)
 
-CameraData:
-	@$(CC) $(LFLAGS) CameraData.hpp CameraData.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
-
-Matcher:
-	@$(CC) $(LFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
-
-Tracker:
-	@$(CC) $(LFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
-
-VanillaTracker:
-	@$(CC) $(LFLAGS) CameraData.cpp Util.hpp Tracker.cpp VanillaTracker.hpp VanillaTracker.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
-
-VanillaMatcher:
-	@$(CC) $(LFLAGS) Matcher.cpp VanillaMatcher.hpp VanillaMatcher.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
-
-run:
-	@./main.o
+square_detect.o: misc/square_detect.cpp
+	$(CC) $(LFLAGS) misc/square_detect.cpp -o square_detect.o $(INCLUDE_DIR) $(LIBRARIES)
 
 clean:
-	@rm *.o
-	@rm *.gch
+	rm -f *.o
+	rm -f *.gch
 

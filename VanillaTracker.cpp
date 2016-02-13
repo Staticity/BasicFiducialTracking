@@ -1,11 +1,11 @@
 #include "VanillaTracker.hpp"
 
-#include "Util.hpp"
-
 #include <calib3d.hpp>
 #include <imgproc.hpp>
 
 #include <assert.h>
+
+#include "Util.hpp"
 
 VanillaTracker::VanillaTracker() {}
 VanillaTracker::~VanillaTracker() {}
@@ -204,9 +204,4 @@ bool VanillaTracker::_triangulate(const Input& in, Args& args, Output& out) cons
     }
 
     return false;
-}
-
-int main()
-{
-    VanillaTracker vt;
 }
