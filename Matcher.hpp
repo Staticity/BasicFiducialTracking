@@ -13,6 +13,7 @@ namespace cv
 
 class Matcher
 {
+public:
     Matcher();
     virtual ~Matcher();
            

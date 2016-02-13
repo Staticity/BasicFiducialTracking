@@ -52,13 +52,19 @@ CameraData:
 Matcher:
 	@$(CC) $(LFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
 
+Tracker:
+	@$(CC) $(LFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
+
 VanillaTracker:
 	@$(CC) $(LFLAGS) CameraData.cpp Util.hpp Tracker.cpp VanillaTracker.hpp VanillaTracker.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
+
+VanillaMatcher:
+	@$(CC) $(LFLAGS) Matcher.cpp VanillaMatcher.hpp VanillaMatcher.cpp $(INCLUDE_DIR) $(LIBRARY_DIR) $(LIBRARIES)
 
 run:
 	@./main.o
 
 clean:
-	rm *.o
-	rm *.gch
+	@rm *.o
+	@rm *.gch
 
