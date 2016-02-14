@@ -48,7 +48,6 @@ int main(int argc, char** argv)
     VanillaTracker tracker;
 
     Tracker::Input in(camera);
-    Tracker::Output out;
 
     Mat                   desc1, desc2;
     std::vector<KeyPoint> feat1, feat2;
@@ -79,52 +78,33 @@ int main(int argc, char** argv)
 
             for (int i = 0; i < pts1.size(); ++i)
             {
-                arrowedLine(source, pts2[i], pts1[i], Scalar(255, 0, 0), 1);
+                arrowedLine(source, pts2[i], pts1[i], Scalar(0, 255, 0), 1);
             }
 
             in.pts1 = pts1;
             in.pts2 = pts2;
+
+            Tracker::Output out;
             success = tracker.triangulate(in, out);
             std::cout << (success ? "true" : "false") << std::endl;
+            std::cout << out.points.size() << std::endl;
+            std::cout << out.rotation << std::endl;
+            std::cout << out.translation << std::endl;
 
-            // mask.clear();
-            // homography = findHomography(pts1, pts2, CV_RANSAC, 1, mask);
-
-
-            // Mat points = (Mat_<double>(4, 3) <<          0,          0, 1,
-            //                                     query.cols,          0, 1,
-            //                                     query.cols, query.rows, 1,
-            //                                              0, query.rows, 1);
-
-            // // H * dest = src, rows are points
-            // Mat warped = (homography * points.t()).t();
-            // assert(warped.type() == CV_64F);
-
-            // vector<Point2d> quad;
-            // const Vec3d* pts = warped.ptr<Vec3d>();
-            // for (int i = 0; i < 4; ++i)
-            // {
-            //     double wx = pts[i][0];
-            //     double wy = pts[i][1];
-            //     double w  = pts[i][2];
-
-            //     assert(w != 0.0);
-
-            //     double x = wx / w;
-            //     double y = wy / w;
-            //     quad.push_back(Point2d(x, y));
-            // }
-
-            // for (int i = 0; i < 4; ++i)
-            // {
-            //     int j = (i + 1) % 4;
-            //     line(source, quad[i], quad[j], Scalar(0, 255, 0), 3);
-            // }
-
-            // Mat drawing;
-            // drawMatches(query, feat1, source, feat2, matches, drawing,
-                        // Scalar::all(-1), Scalar::all(-1), mask);
-            // imshow("drawing", drawing);
+            if (success)
+            {
+                std::vector<Point2d> matched2d;
+                std::vector<Point3d> matched3d;
+                for (int i = 0; i < out.points.size(); ++i)
+                {
+                    matched2d.push_back(pts2[out.points[i].index]);
+                    matched3d.push_back(out.points[i].pt);
+                    cout << matched3d[i].x << " " << matched3d[i].y << " " << matched3d[i].z << endl;
+                    // Scalar color = source.at<Scalar>(matched2d[i].y, matched2d[i].x);
+                    // cout << color[0] << " " << color[1] << " " << color[2] << endl;
+                }
+                waitKey();
+            }
         }
         // else 
         {
