@@ -1,7 +1,7 @@
 CC          = c++
 LFLAGS      = 
 CFLAGS      = -c 
-OBJS        =  Util.o CameraData.o Tracker.o Matcher.o VanillaTracker.o VanillaMatcher.o main.o
+OBJS        =  CameraData.o Tracker.o Matcher.o VanillaTracker.o FlowMatcher.o main.o
 INCLUDE_DIR = -I/usr/local/include/opencv -I/usr/local/include/opencv2
 LIBRARIES   = -lopencv_calib3d     \
               -lopencv_core        \
@@ -23,10 +23,10 @@ LIBRARIES   = -lopencv_calib3d     \
               -lopencv_xfeatures2d
 
 
-run.o: clean main.o
-	$(CC) $(LFLAGS) *.o -o run.o $(INCLUDE_DIR) $(LIBRARIES)
+run.o: main.o
+	$(CC) $(LFLAGS) $(OBJS) -o run.o $(INCLUDE_DIR) $(LIBRARIES)
 
-main.o: CameraData.o VanillaTracker.o VanillaMatcher.o
+main.o: CameraData.o VanillaTracker.o FlowMatcher.o
 	$(CC) $(CFLAGS) main.cpp $(INCLUDE_DIR)
 
 correspondences.o: CameraData.o misc/correspondences.cpp
@@ -43,6 +43,9 @@ VanillaTracker.o: Util.o Tracker.o VanillaTracker.cpp
 
 Tracker.o: CameraData.o Tracker.cpp
 	$(CC) $(CFLAGS) Tracker.hpp Tracker.cpp $(INCLUDE_DIR)
+
+FlowMatcher.o: Matcher.o FlowMatcher.cpp
+	$(CC) $(CFLAGS) FlowMatcher.hpp FlowMatcher.cpp $(INCLUDE_DIR)
 
 VanillaMatcher.o: Matcher.o VanillaMatcher.cpp
 	$(CC) $(CFLAGS) VanillaMatcher.hpp VanillaMatcher.cpp $(INCLUDE_DIR)

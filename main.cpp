@@ -4,7 +4,7 @@
 
 #include "Util.hpp"
 #include "CameraData.hpp"
-#include "VanillaMatcher.hpp"
+#include "FlowMatcher.hpp"
 #include "VanillaTracker.hpp"
 #include "CameraData.hpp"
 
@@ -44,26 +44,24 @@ int main(int argc, char** argv)
     Mat source, query;
     // Mat query = imread("images/Lenna.png");
 
-    Mat                   desc1, desc2;
-    std::vector<KeyPoint> feat1, feat2;
-    std::vector<Point2d>   pts1,  pts2;
-    std::vector<DMatch>   matches;
-
-    VanillaMatcher matcher;
+    FlowMatcher matcher;
     VanillaTracker tracker;
 
     Tracker::Input in(camera);
     Tracker::Output out;
 
+    Mat                   desc1, desc2;
+    std::vector<KeyPoint> feat1, feat2;
+    std::vector<Point2d>   pts1,  pts2;
+    std::vector<DMatch>  matches;
     vc >> query;
     while (vc.isOpened())
     {
         vc >> source;
 
+        feat1.clear();
         feat2.clear();
-        desc2 = Mat();
         matches.clear();
-
         bool success = matcher.match(query, source, feat1, feat2, desc1, desc2, matches);
 
         if (success)
@@ -73,11 +71,16 @@ int main(int argc, char** argv)
 
             Util::toPoints(feat1, feat2, matches, pts1, pts2);
 
-            vector<uchar> mask;
+            vector<uchar> mask(pts1.size());
             Mat homography = findHomography(pts1, pts2, CV_RANSAC, 2, mask);
-            Util::retain(vector<Point2d>(pts1)  , mask, pts1);
-            Util::retain(vector<Point2d>(pts2)  , mask, pts2);
-            Util::retain(vector<DMatch>(matches), mask, matches);
+
+            Util::retain(vector<Point2d>(pts1), mask, pts1);
+            Util::retain(vector<Point2d>(pts2), mask, pts2);
+
+            for (int i = 0; i < pts1.size(); ++i)
+            {
+                arrowedLine(source, pts2[i], pts1[i], Scalar(255, 0, 0), 1);
+            }
 
             in.pts1 = pts1;
             in.pts2 = pts2;
@@ -128,8 +131,7 @@ int main(int argc, char** argv)
             imshow("drawing", source);
         }
 
-        query = source;
-
+        query = source.clone();
         char c = waitKey(20);
         if      (c ==  27) break;
     }

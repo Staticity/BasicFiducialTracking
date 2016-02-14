@@ -19,22 +19,11 @@ bool VanillaMatcher::match(const cv::Mat&             img1,
     bool do_desc1 = desc1.empty();
     bool do_desc2 = desc2.empty();
 
-    cv::Mat gray1, gray2;
-    if ((do_feat1 || do_desc1) && img1.channels() != 1)
-        cvtColor(img1, gray1, CV_BGR2GRAY);
-    else
-        gray1 = img1;
-
-    if ((do_feat2 || do_desc2) && img2.channels() != 1)
-        cvtColor(img2, gray2, CV_BGR2GRAY);
-    else
-        gray2 = img2;
-
     if (do_feat1 || do_feat2)
     {
-        // cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SURF::create(400);
+        cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SURF::create(400);
         // cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SIFT::create();
-        cv::Ptr<cv::FeatureDetector> detector = cv::FastFeatureDetector::create(20);
+        // cv::Ptr<cv::FeatureDetector> detector = cv::FastFeatureDetector::create(20);
         // cv::Ptr<cv::FeatureDetector> detector = cv::BRISK::create();
 
         if (do_feat1) detector->detect(img1, feat1);

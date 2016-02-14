@@ -13,6 +13,7 @@ namespace Util
                        const std::vector<B>&             mask,
                        std::vector<T>&                    dst)
     {
+        assert(src.size() == mask.size());
         for (int i = 0; i < src.size(); ++i)
             if (mask[i])
                 dst.push_back(src[i]);
@@ -32,7 +33,7 @@ namespace Util
     }
 
     inline void toPoints(const std::vector<cv::KeyPoint>& keypoints,
-                         std::vector<cv::Point2d>&           points)
+                         std::vector<cv::Point2f>&           points)
     {
         for (int i = 0; i < keypoints.size(); ++i)
             points.push_back(cv::Point2d(keypoints[i].pt));
