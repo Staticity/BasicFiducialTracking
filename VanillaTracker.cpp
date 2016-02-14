@@ -1,12 +1,17 @@
 #include "VanillaTracker.hpp"
 
+#include <highgui.hpp>
 #include <calib3d.hpp>
 #include <imgproc.hpp>
 
 #include <assert.h>
 #include <iostream>
+#include <cstdio>
 
 #include "Util.hpp"
+#include <math.h>
+
+#define EPSILON 10e-9
 
 VanillaTracker::VanillaTracker() {}
 VanillaTracker::~VanillaTracker() {}
@@ -19,14 +24,14 @@ bool VanillaTracker::triangulate(const Input& in, Output& out) const
     Args args;
     out = Output();
 
-    std::cout << "fundamental" << std::endl;
+    // std::cout << "fundamental" << std::endl;
     if (!_computeFundamental (in, args, out)) return false;
-    std::cout << "essential" << std::endl;
+    // std::cout << "essential" << std::endl;
     if (!_computeEssential   (in, args, out)) return false;
 #if 0
     if (!_undistortPoints    (in, args, out)) return false;
 #endif
-    std::cout << "get cloud" << std::endl;
+    // std::cout << "get cloud" << std::endl;
     if (!_getCloud           (in, args, out)) return false;
 
     return true;
@@ -34,18 +39,27 @@ bool VanillaTracker::triangulate(const Input& in, Output& out) const
 
 bool VanillaTracker::_computeFundamental(const Input& in, Args& args, Output& out) const
 {
-    static int min_inliers = 100;
+    static const int min_inliers = 20;
     int num_points = in.pts1.size();
 
-    // double maxVal;
-    // cv::minMaxIdx(in.pts1, 0, &maxVal);
+    double maxVal;
+    cv::minMaxIdx(in.pts1, 0, &maxVal);
     args.mask = std::vector<uchar>(num_points);
-    out.fundamental = findFundamentalMat(in.pts1, in.pts2, cv::FM_RANSAC, 0.1/*0.006 * maxVal*/, 0.99, args.mask);
+    out.fundamental = findFundamentalMat(in.pts1, in.pts2, cv::FM_RANSAC, 0.006 * maxVal, 0.99, args.mask);
 
     num_points = cv::countNonZero(args.mask);
 
-    if (num_points < min_inliers) return false;
-    if (out.fundamental.empty()) return false;
+    if (out.fundamental.empty())
+    {
+        printf("[fundamental]: fundamental matrix empty\n");
+        return false;
+    }
+
+    if (num_points < min_inliers)
+    {
+        printf("[fundamental]: not enough inliers: %d/%d\n", num_points, min_inliers);
+        return false;
+    }
 
     return true;
 }
@@ -65,17 +79,20 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
     out.essential = camera_matrix.t() * out.fundamental * camera_matrix;
 
     // Keep this......?
-    if (!Util::feq(determinant(out.essential), 0)) return false;// std::cout << determinant(out.essential) << std::endl;
-    assert(out.essential.type() == CV_64F);
+    if (std::abs(determinant(out.essential)) > 1e-4)
+    {
+        printf("[essential]: expected determinant of 0, received: %f", determinant(out.essential));
+        return false;
+    }
 
     // Compute essential matrix and its SVD decomp,
     // as well as the expected rotations and translations.
     // TODO: Make assertions return false with error message?
     {
-        cv::SVD svd(out.essential, cv::SVD::MODIFY_A);
+        cv::SVD svd(out.essential);
         out.essential = svd.u * D * svd.vt; // Recompute E with D diagonal
 
-        svd = cv::SVD(out.essential , cv::SVD::MODIFY_A);
+        svd = cv::SVD(out.essential);
 
         // to be a "valid" essential matrix, we need the
         // rotation vector to be 1, we can accomplish
@@ -87,7 +104,7 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
             // This doesn't always work for some reason...
             // Sometimes we still get a rotation with -1
             out.essential = -out.essential;
-            svd = cv::SVD(out.essential , cv::SVD::MODIFY_A);
+            svd = cv::SVD(out.essential);
             // svd.vt.row(2) = -svd.vt.row(2);
         }
 
@@ -127,8 +144,8 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
 
 bool VanillaTracker::_undistortPoints(const Input& in, Args& args, Output& out) const
 {
-    cv::undistortPoints(args.inliers1, args.undistortedPts1, in.camera.matrix(), in.camera.distortion());
-    cv::undistortPoints(args.inliers2, args.undistortedPts2, in.camera.matrix(), in.camera.distortion());
+    // cv::undistortPoints(args.inliers1, args.undistortedPts1, in.camera.matrix(), in.camera.distortion());
+    // cv::undistortPoints(args.inliers2, args.undistortedPts2, in.camera.matrix(), in.camera.distortion());
 
     return true;
 }
@@ -156,7 +173,7 @@ cv::Mat_<double> VanillaTracker::_triangulatePoint(const cv::Point3d& u, const c
 
     cv::Mat_<double> X;
     cv::solve(A, B, X, cv::DECOMP_SVD);
-
+    
     return X;
 }
 
@@ -252,7 +269,7 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
             int num_in_front  = cv::countNonZero(status);
             double front_percent = ((double)(num_in_front)) / std::max(1, num_points);
 
-            std::cout << front_percent << std::endl;
+            // std::cout << front_percent << std::endl;
 
             // Not enough points in front
             if (front_percent < min_percent) continue;
@@ -296,24 +313,65 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
             double error_total = 0.0;
             cv::Mat camera     = in.camera.matrix();
             cv::Mat camera_inv = camera.inv();
+            // std::cout << "Camera:" << std::endl;
+            // std::cout << camera << std::endl;
+            // std::cout << "Camera Inverse:" << std::endl;
+            // std::cout << camera_inv << std::endl;
+            // std::cout << "Translation: " << translation << std::endl;
+            // std::cout << "Rotation: " << rotation << std::endl;
+            // std::cout << "Projection: " << P2 << std::endl;
+            // std::cout << std::endl;
+
+            cv::Mat_<double> KP1 = camera * P1;
+            cv::Mat_<double> KP2 = camera * P2;
+            cv::Matx34d KP1x34d  = cv::Matx34d(KP1(0, 0), KP1(0, 1), KP1(0, 2), KP1(0, 3),
+                                               KP1(1, 0), KP1(1, 1), KP1(1, 2), KP1(1, 3),
+                                               KP1(2, 0), KP1(2, 1), KP1(2, 2), KP1(2, 3));
+
+            cv::Matx34d KP2x34d  = cv::Matx34d(KP2(0, 0), KP2(0, 1), KP2(0, 2), KP2(0, 3),
+                                               KP2(1, 0), KP2(1, 1), KP2(1, 2), KP2(1, 3),
+                                               KP2(2, 0), KP2(2, 1), KP2(2, 2), KP2(2, 3));
+
             for (int k = 0; k < num_points; ++k)
             {
                 cv::Point2d pt1 = args.inliers1[k];
                 cv::Point2d pt2 = args.inliers2[k];
+
+                // std::cout << "Point 1:" << std::endl;
+                // std::cout << pt1 << std::endl;
+                // std::cout << "Point 2:" << std::endl;
+                // std::cout << pt2 << std::endl;
 
                 cv::Point3d u(pt1.x, pt1.y, 1.0);
                 cv::Point3d v(pt2.x, pt2.y, 1.0);
                 
                 cv::Mat_<double> u_3d    = camera_inv * cv::Mat(u);
                 cv::Mat_<double> v_3d    = camera_inv * cv::Mat(v);
-                cv::Mat_<double> pt_3d   = _iterativeTriangulate(u, P1, v, P2);
+                cv::Mat_<double> pt_3d   = _iterativeTriangulate(u, KP1x34d, v, KP2x34d);
 
-                cv::Mat_<double> proj_pt = camera * P1 * pt_3d;
+                // std::cout << "Left:" << std::endl;
+                // std::cout << u_3d << std::endl;
 
-                assert(!Util::feq(pt_3d(2), 0.0));
-                cv::Point2d img_pt1(proj_pt(0) / proj_pt(2), proj_pt(1) / proj_pt(2));
+                // std::cout << "Right:" << std::endl;
+                // std::cout << v_3d << std::endl;
 
-                double error = norm(pt1 - img_pt1);
+                // std::cout << "Best:" << std::endl;
+                // std::cout << pt_3d << std::endl;
+
+                cv::Mat_<double> proj_pt1 = camera * P1 * pt_3d;// (cv::Mat_<double>(4, 1) << u_3d(0),u_3d(1),u_3d(2),1);
+
+                if (Util::feq(proj_pt1(2), 0.0)) continue;
+                cv::Point2d img_pt1(proj_pt1(0) / proj_pt1(2), proj_pt1(1) / proj_pt1(2));
+                // std::cout << "Projection:" << std::endl;
+                // std::cout << proj_pt << std::endl;
+
+                // std::cout << "Guess:" << std::endl;
+                // std::cout << img_pt1 << std::endl;
+
+                // std::cout << "Actual:" << std::endl;
+                // std::cout << pt1 << std::endl;
+
+                double error = norm(img_pt1 - pt1);//(norm(u_3d - pt_3d) + norm(v_3d - pt_3d)) / 2.0;
                 error_total += error;
 
                 bool is_in_front  = pt_3d(2) > 0.0;
@@ -324,32 +382,38 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
                 if (is_in_front && is_low_error)
                 {
                     out.points.push_back(CloudPoint());
-                    out.points[i].pt = cv::Point3d(pt_3d(0), pt_3d(1), pt_3d(2));
-                    out.points[i].index = args.indices[k];
+
+                    int out_index = out.points.size() - 1;
+                    out.points[out_index].pt = cv::Point3d(pt_3d(0), pt_3d(1), pt_3d(2));
+                    out.points[out_index].index = args.indices[k];
                 }
             }
 
             const double front_percent = ((double)(in_front)) / std::max(1, num_points);
             const double error_avg     = error_total / std::max(1, num_points);
 
-            std::cout << (front_percent * 100.0) << "%" << " " << error_avg << std::endl;
+            // std::cout << (front_percent * 100.0) << "%" << " " << error_avg << std::endl;
 
-            if (front_percent < min_percent && error_avg < min_error)
+            if (front_percent >= min_percent && error_avg < min_error)
             {
-                out.rotation = rotation;
-                out.translation = translation;
+                out.rotation = rotation.clone();
+                out.translation = translation.clone();
                 out.visible_percent = front_percent;
                 out.avg_reprojection_error = error_avg;
+                // std::cout << "Uh, returning true.....?" << std::endl;
+                // cv::waitKey();
                 return true;
             }
             else
             {
                 out.points.clear();
             }
+            // std::cout << std::endl;
+            // cv::waitKey();
 #endif
         }
     }
-    std::cout << std::endl;
+    // std::cout << std::endl;
 
     return false;
 }

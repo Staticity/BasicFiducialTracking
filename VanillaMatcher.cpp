@@ -21,9 +21,9 @@ bool VanillaMatcher::match(const cv::Mat&             img1,
 
     if (do_feat1 || do_feat2)
     {
-        cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SURF::create(400);
+        // cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SURF::create(400);
         // cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SIFT::create();
-        // cv::Ptr<cv::FeatureDetector> detector = cv::FastFeatureDetector::create(20);
+        cv::Ptr<cv::FeatureDetector> detector = cv::FastFeatureDetector::create(40);
         // cv::Ptr<cv::FeatureDetector> detector = cv::BRISK::create();
 
         if (do_feat1) detector->detect(img1, feat1);
@@ -35,9 +35,9 @@ bool VanillaMatcher::match(const cv::Mat&             img1,
 
     if (do_desc1 || do_desc2)
     {
-        cv::Ptr<cv::DescriptorExtractor> extractor = cv::xfeatures2d::SURF::create();
+        // cv::Ptr<cv::DescriptorExtractor> extractor = cv::xfeatures2d::SURF::create();
         // cv::Ptr<cv::DescriptorExtractor> extractor = cv::xfeatures2d::SIFT::create();
-        // cv::Ptr<cv::DescriptorExtractor> extractor = cv::ORB::create();
+        cv::Ptr<cv::DescriptorExtractor> extractor = cv::ORB::create();
         // cv::Ptr<cv::DescriptorExtractor> extractor = cv::xfeatures2d::BriefDescriptorExtractor::create(32, true);
 
         if (do_desc1) extractor->compute(img1, feat1, desc1);

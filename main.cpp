@@ -54,6 +54,7 @@ int main(int argc, char** argv)
     std::vector<Point2d>   pts1,  pts2;
     std::vector<DMatch>  matches;
     vc >> query;
+
     while (vc.isOpened())
     {
         vc >> source;
@@ -88,23 +89,23 @@ int main(int argc, char** argv)
             success = tracker.triangulate(in, out);
             std::cout << (success ? "true" : "false") << std::endl;
             std::cout << out.points.size() << std::endl;
-            std::cout << out.rotation << std::endl;
-            std::cout << out.translation << std::endl;
+            // std::cout << out.rotation << std::endl;
+            // std::cout << out.translation << std::endl;
 
-            if (success)
-            {
-                std::vector<Point2d> matched2d;
-                std::vector<Point3d> matched3d;
-                for (int i = 0; i < out.points.size(); ++i)
-                {
-                    matched2d.push_back(pts2[out.points[i].index]);
-                    matched3d.push_back(out.points[i].pt);
-                    cout << matched3d[i].x << " " << matched3d[i].y << " " << matched3d[i].z << endl;
-                    // Scalar color = source.at<Scalar>(matched2d[i].y, matched2d[i].x);
-                    // cout << color[0] << " " << color[1] << " " << color[2] << endl;
-                }
-                waitKey();
-            }
+            // if (success)
+            // {
+            //     std::vector<Point2d> matched2d;
+            //     std::vector<Point3d> matched3d;
+            //     for (int i = 0; i < out.points.size(); ++i)
+            //     {
+            //         matched2d.push_back(pts2[out.points[i].index]);
+            //         matched3d.push_back(out.points[i].pt);
+            //         cout << matched3d[i].x << " " << matched3d[i].y << " " << matched3d[i].z << endl;
+            //         // Scalar color = source.at<Scalar>(matched2d[i].y, matched2d[i].x);
+            //         // cout << color[0] << " " << color[1] << " " << color[2] << endl;
+            //     }
+            //     waitKey();
+            // }
         }
         // else 
         {
