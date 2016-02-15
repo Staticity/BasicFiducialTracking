@@ -95,38 +95,56 @@ int main(int argc, char** argv)
             in.pts2 = good_pts2;
 
             Tracker::Output out;
-            // success = tracker.triangulate(in, out);
+            success = tracker.triangulate(in, out);
 
-            // if (out.points.size() > 0)
-            // {
-            //     // ++good;
-            //     // cout << good << "/" << total << endl;
-            //     // printf("Tracking was a %s\n", (success ? "SUCCESS" : "FAILURE"));
-            //     double minV = out.points[0].pt.z;
-            //     double maxV = minV;
+            if (out.points.size() > 0)
+            {
+                // ++good;
+                // cout << good << "/" << total << endl;
+                // printf("Tracking was a %s\n", (success ? "SUCCESS" : "FAILURE"));
+                double minV = out.points[0].pt.z;
+                double maxV = minV;
 
-            //     int num_bad = minV > 1.0;
-            //     for (int i = 1; i < out.points.size(); ++i)
-            //     {
-            //         double z = out.points[i].pt.z;
-            //         minV = (z < minV) ? z : minV;
-            //         maxV = (z > maxV) ? z : maxV;
-            //         num_bad += z > 1.0;
-            //     }
+                int num_bad = minV > 1.0;
+                for (int i = 1; i < out.points.size(); ++i)
+                {
+                    double z = out.points[i].pt.z;
+                    minV = (z < minV) ? z : minV;
+                    maxV = (z > maxV) ? z : maxV;
+                    num_bad += z > 1.0;
+                }
 
-            //     for (int i = 0; i < out.points.size() && !Util::feq(maxV - minV, 0.0); ++i)
-            //     {
-            //         int j = out.points[i].index;
-            //         double z = out.points[i].pt.z;
-            //         z = max(minV, min(z, maxV));
-            //         double s = 1.0 - ( (z - minV) / (maxV - minV));
-            //         assert(s <= 1.0 && s >= 0.0);
-            //         Scalar r = Scalar(0, 0, 255);
-            //         Scalar g = Scalar(0, 255, 0);
-            //         Scalar c = r * s + g * (1 - s);
-            //         // Scalar c = Scalar(255 * (1 - s), 255, 255);
-            //         circle(drawing, good_pts2[j], 1, c, CV_FILLED);
-            //     }
+                for (int i = 0; i < out.points.size() && !Util::feq(maxV - minV, 0.0); ++i)
+                {
+                    int j = out.points[i].index;
+                    double z = out.points[i].pt.z;
+                    z = max(minV, min(z, maxV));
+                    double s = 1.0 - ( (z - minV) / (maxV - minV));
+                    assert(s <= 1.0 && s >= 0.0);
+                    Scalar r = Scalar(0, 0, 255);
+                    Scalar g = Scalar(0, 255, 0);
+                    Scalar c = r * s + g * (1 - s);
+                    // Scalar c = Scalar(255 * (1 - s), 255, 255);
+                    circle(drawing, good_pts2[j], 1, c, CV_FILLED);
+                }
+
+                for (int i = 0; i < 100; ++i)
+                    cout << endl;
+
+                for (int i = 0; i < out.points.size(); ++i)
+                {
+                    Point3d cloudPoint = out.points[i].pt;
+                    Point2d imagePoint = good_pts2[out.points[i].index];
+                    Vec3b   color      = query.at<Vec3b>(imagePoint);
+                    printf("%f %f %f %d %d %d\n", cloudPoint.x, cloudPoint.y, cloudPoint.z, color[0], color[1], color[2]);
+                }
+
+                if (maxV > 1.0)
+                {
+                    printf("Range of z: [%f, %f] with %d/%lu considered bad\n\n", minV, maxV, num_bad, out.points.size());
+                    waitKey();
+                }
+            }
                 // cvtColor(drawing, drawing, CV_HSV2BGR);
 
                 // printf("Num in cloud: %lu/%lu\nVisibility: %f%%\nAverage error: %f\n", out.points.size(), pts1.size(), out.visible_percent * 100.0, out.avg_reprojection_error);

@@ -1,0 +1,10 @@
+ply
+format ascii 1.0
+element vertex __put_num_vertices_here__
+property float x
+property float y
+property float z
+property uchar blue
+property uchar green
+property uchar red
+end_header
