@@ -128,24 +128,24 @@ int main(int argc, char** argv)
                     circle(drawing, good_pts2[j], 1, c, CV_FILLED);
                 }
 
-                for (int i = 0; i < 100; ++i)
-                    cout << endl;
+                // for (int i = 0; i < 100; ++i)
+                //     cout << endl;
 
-                for (int i = 0; i < out.points.size(); ++i)
-                {
-                    Point3d cloudPoint = out.points[i].pt;
-                    Point2d imagePoint = good_pts2[out.points[i].index];
-                    Vec3b   color      = query.at<Vec3b>(imagePoint);
-                    printf("%f %f %f %d %d %d\n", cloudPoint.x, cloudPoint.y, cloudPoint.z, color[0], color[1], color[2]);
-                }
+                // for (int i = 0; i < out.points.size(); ++i)
+                // {
+                //     Point3d cloudPoint = out.points[i].pt;
+                //     Point2d imagePoint = good_pts2[out.points[i].index];
+                //     Vec3b   color      = query.at<Vec3b>(imagePoint);
+                //     printf("%f %f %f %d %d %d\n", cloudPoint.x, cloudPoint.y, cloudPoint.z, color[0], color[1], color[2]);
+                // }
 
                 if (maxV > 1.0)
                 {
-                    printf("Range of z: [%f, %f] with %d/%lu considered bad\n\n", minV, maxV, num_bad, out.points.size());
-                    waitKey();
+                    // printf("Range of z: [%f, %f] with %d/%lu considered bad\n\n", minV, maxV, num_bad, out.points.size());
+                    // waitKey();
                 }
             }
-                // cvtColor(drawing, drawing, CV_HSV2BGR);
+                cvtColor(drawing, drawing, CV_HSV2BGR);
 
                 // printf("Num in cloud: %lu/%lu\nVisibility: %f%%\nAverage error: %f\n", out.points.size(), pts1.size(), out.visible_percent * 100.0, out.avg_reprojection_error);
                 // printf("Range of z: [%f, %f] with %d/%lu considered bad\n\n", minV, maxV, num_bad, out.points.size());
@@ -161,7 +161,7 @@ int main(int argc, char** argv)
                 // }
             // }
 
-            // imshow("drawing", drawing);
+            imshow("drawing", drawing);
         }
         // else 
         {

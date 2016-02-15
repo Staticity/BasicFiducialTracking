@@ -47,12 +47,13 @@ bool VanillaTracker::_computeFundamental(const Input& in, Args& args, Output& ou
         return false;
     }
 
-    double maxVal;
-    cv::minMaxIdx(in.pts1, 0, &maxVal);
-    cv::minMaxIdx(in.pts2, 0, &maxVal);
+    double maxVal1, maxVal2;
+    cv::minMaxIdx(in.pts1, 0, &maxVal1);
+    cv::minMaxIdx(in.pts2, 0, &maxVal1);
+    double maxVal = std::max(maxVal1, maxVal2); // not sure if passing same works.
+
     args.mask = std::vector<uchar>(num_points);
     out.fundamental = findFundamentalMat(in.pts1, in.pts2, cv::FM_RANSAC, 0.006 * maxVal, 0.99, args.mask);
-
     num_points = cv::countNonZero(args.mask);
 
     if (out.fundamental.empty())
@@ -111,9 +112,9 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
             // NOTE:
             // This doesn't always work for some reason...
             // Sometimes we still get a rotation with -1
-            // out.essential = -out.essential;
-            // svd = cv::SVD(out.essential);
-            svd.vt.row(2) = -svd.vt.row(2);
+            out.essential = -out.essential;
+            svd = cv::SVD(out.essential);
+            // svd.vt.row(2) = -svd.vt.row(2);
         }
 
         cv::Mat r1 =  svd.u *   W   * svd.vt;
@@ -155,7 +156,7 @@ bool VanillaTracker::_undistortPoints(const Input& in, Args& args, Output& out) 
     cv::undistortPoints(args.inliers1, args.undistortedPts1, in.camera.matrix(), in.camera.distortion());
     cv::undistortPoints(args.inliers2, args.undistortedPts2, in.camera.matrix(), in.camera.distortion());
 
-    return true;
+    return false; // unused
 }
 
 /**
@@ -314,16 +315,6 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
             cv::Mat camera     = in.camera.matrix();
             cv::Mat camera_inv = camera.inv();
 
-            cv::Mat_<double> KP1 = camera * P1;
-            cv::Mat_<double> KP2 = camera * P2;
-            cv::Matx34d KP1x34d  = cv::Matx34d(KP1(0, 0), KP1(0, 1), KP1(0, 2), KP1(0, 3),
-                                               KP1(1, 0), KP1(1, 1), KP1(1, 2), KP1(1, 3),
-                                               KP1(2, 0), KP1(2, 1), KP1(2, 2), KP1(2, 3));
-
-            cv::Matx34d KP2x34d  = cv::Matx34d(KP2(0, 0), KP2(0, 1), KP2(0, 2), KP2(0, 3),
-                                               KP2(1, 0), KP2(1, 1), KP2(1, 2), KP2(1, 3),
-                                               KP2(2, 0), KP2(2, 1), KP2(2, 2), KP2(2, 3));
-
             int in_front = 0;
             double error_total = 0.0;
             for (int k = 0; k < num_points; ++k)
@@ -334,10 +325,18 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
                 cv::Point3d u(pt1.x, pt1.y, 1.0);
                 cv::Point3d v(pt2.x, pt2.y, 1.0);
                 
-                cv::Mat_<double> u_3d    = camera_inv * cv::Mat(u);
-                cv::Mat_<double> v_3d    = camera_inv * cv::Mat(v);
-                cv::Mat_<double> pt_3d   = _iterativeTriangulate(u, KP1x34d, v, KP2x34d);
+                cv::Mat_<double> u_3d  = camera_inv * cv::Mat(u);
+                cv::Mat_<double> v_3d  = camera_inv * cv::Mat(v);
 
+                u.x = u_3d(0);
+                u.y = u_3d(1);
+                u.z = u_3d(2);
+                
+                v.x = v_3d(0);
+                v.y = v_3d(1);
+                v.z = v_3d(2);
+
+                cv::Mat_<double> pt_3d = _iterativeTriangulate(u, P1, v, P2);
                 cv::Mat_<double> proj_pt1 = camera * P1 * pt_3d;
 
                 if (Util::feq(proj_pt1(2), 0.0)) continue;
@@ -363,6 +362,8 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
 
             const double front_percent = ((double)(in_front)) / std::max(1, num_points);
             const double error_avg     = error_total / std::max(1, num_points);
+
+            std::cout << front_percent * 100.0 << "%\t" << error_avg << std::endl;
 
             if (front_percent >= min_percent && error_avg < min_error)
             {
