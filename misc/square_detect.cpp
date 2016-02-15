@@ -419,21 +419,21 @@ void get_square_pose(const vector<Point>& quad,
 {
     assert(quad.size() == 4);
 
-    double object_points[4][3] =
+    float object_points[4][3] =
     {
-        {-1.0,  1.0,  0.0f},
-        { 1.0,  1.0,  0.0f},
-        { 1.0, -1.0,  0.0f},
-        {-1.0, -1.0,  0.0f},
+        {-1.0f,  1.0f,  0.0f},
+        { 1.0f,  1.0f,  0.0f},
+        { 1.0f, -1.0f,  0.0f},
+        {-1.0f, -1.0f,  0.0f},
     };
 
-    Mat object_mat = Mat(quad.size(), 3, CV_64F, object_points);
-    Mat quad_mat = Mat(quad.size(), 2, CV_64F);
+    Mat object_mat = Mat(quad.size(), 3, CV_32F, object_points);
+    Mat quad_mat = Mat(quad.size(), 2, CV_32F);
 
     for (int i = 0; i < quad.size(); ++i)
     {
-        quad_mat.at<double>(i, 0) = quad[i].x;
-        quad_mat.at<double>(i, 1) = quad[i].y;
+        quad_mat.at<float>(i, 0) = quad[i].x;
+        quad_mat.at<float>(i, 1) = quad[i].y;
     }
 
     solvePnP(object_mat, quad_mat, camera_matrix, distortion_coeff, rot, trans);
@@ -534,6 +534,7 @@ int main(int argc, char** argv)
     VideoCapture vc(index);
     vc.set(CV_CAP_PROP_FRAME_WIDTH, width);
     vc.set(CV_CAP_PROP_FRAME_HEIGHT, height);
+    // vc.set(CV_CAP_PROP_FPS, 30);
 
     if (!vc.isOpened()) return 0;
 

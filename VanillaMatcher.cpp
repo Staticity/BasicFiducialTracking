@@ -30,7 +30,10 @@ bool VanillaMatcher::match(const cv::Mat&             img1,
         if (do_feat2) detector->detect(img2, feat2);
 
         if (feat1.empty() || feat2.empty())
+        {
+            printf("[match]: not enough features\n");
             return false;
+        }
     }
 
     if (do_desc1 || do_desc2)
@@ -44,12 +47,20 @@ bool VanillaMatcher::match(const cv::Mat&             img1,
         if (do_desc2) extractor->compute(img2, feat2, desc2);
 
         if (desc1.empty() || desc2.empty())
+        {
+            printf("[match]: descriptors computed empty\n");
             return false;
+        }
     }
 
     // Change distance based on descriptor
     cv::BFMatcher matcher = cv::BFMatcher::BFMatcher(cv::NORM_L2, true);
     matcher.match(desc1, desc2, matches);
 
+    // cv::Mat drawing;
+    // cv::drawMatches(img1, feat1, img2, feat2, matches, drawing);
+    // cv::imshow("test", drawing);
+    // cv::waitKey();
+    // cv::destroyWindow("test");
     return !matches.empty();
 }

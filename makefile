@@ -1,7 +1,7 @@
 CC          = c++
 LFLAGS      = 
 CFLAGS      = -c 
-OBJS        =  CameraData.o Tracker.o Matcher.o VanillaTracker.o FlowMatcher.o main.o
+OBJS        =  CameraData.o Tracker.o Matcher.o VanillaTracker.o FlowMatcher.o VanillaMatcher.o HybridMatcher.o main.o
 INCLUDE_DIR = -I/usr/local/include/opencv -I/usr/local/include/opencv2
 LIBRARIES   = -lopencv_calib3d     \
               -lopencv_core        \
@@ -26,7 +26,7 @@ LIBRARIES   = -lopencv_calib3d     \
 run.o: main.o
 	$(CC) $(LFLAGS) $(OBJS) -o run.o $(INCLUDE_DIR) $(LIBRARIES)
 
-main.o: CameraData.o VanillaTracker.o FlowMatcher.o
+main.o: CameraData.o VanillaTracker.o HybridMatcher.o
 	$(CC) $(CFLAGS) main.cpp $(INCLUDE_DIR)
 
 correspondences.o: CameraData.o misc/correspondences.cpp
@@ -34,6 +34,9 @@ correspondences.o: CameraData.o misc/correspondences.cpp
 
 square_detect.o: misc/square_detect.cpp
 	$(CC) $(LFLAGS) misc/square_detect.cpp -o square_detect.o $(INCLUDE_DIR) $(LIBRARIES)
+
+video_stream.o:
+	$(CC) $(LFLAGS) misc/video_stream.cpp -o video_stream.o $(INCLUDE_DIR) $(LIBRARIES)
 
 Util.o:
 	$(CC) $(CFLAGS) Util.hpp $(INCLUDE_DIR)
@@ -49,6 +52,9 @@ FlowMatcher.o: Matcher.o FlowMatcher.cpp
 
 VanillaMatcher.o: Matcher.o VanillaMatcher.cpp
 	$(CC) $(CFLAGS) VanillaMatcher.hpp VanillaMatcher.cpp $(INCLUDE_DIR)
+    
+HybridMatcher.o: VanillaMatcher.o FlowMatcher.o HybridMatcher.cpp
+	$(CC) $(CFLAGS) HybridMatcher.hpp HybridMatcher.cpp $(INCLUDE_DIR)
     
 Matcher.o: Matcher.cpp
 	$(CC) $(CFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR)

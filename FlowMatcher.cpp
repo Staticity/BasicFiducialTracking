@@ -26,10 +26,14 @@ bool FlowMatcher::match(const cv::Mat&             img1,
     desc1 = cv::Mat();
     desc2 = cv::Mat();
 
-    bool do_feat1 = feat1.empty();
-    bool do_feat2 = feat2.empty();
-    bool do_desc1 = desc1.empty();
-    bool do_desc2 = desc2.empty();
+    // bool do_feat1 = feat1.empty();
+    // bool do_feat2 = feat2.empty();
+    // bool do_desc1 = desc1.empty();
+    // bool do_desc2 = desc2.empty();
+    bool do_feat1 = true;
+    bool do_feat2 = true;
+    bool do_desc1 = true;
+    bool do_desc2 = true;
 
     assert(do_feat1 && do_feat2 && do_desc1 && do_desc2);
 

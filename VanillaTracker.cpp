@@ -11,7 +11,7 @@
 #include "Util.hpp"
 #include <math.h>
 
-#define EPSILON 10e-9
+#define DEBUG false
 
 VanillaTracker::VanillaTracker() {}
 VanillaTracker::~VanillaTracker() {}
@@ -24,14 +24,11 @@ bool VanillaTracker::triangulate(const Input& in, Output& out) const
     Args args;
     out = Output();
 
-    // std::cout << "fundamental" << std::endl;
     if (!_computeFundamental (in, args, out)) return false;
-    // std::cout << "essential" << std::endl;
     if (!_computeEssential   (in, args, out)) return false;
 #if 0
     if (!_undistortPoints    (in, args, out)) return false;
 #endif
-    // std::cout << "get cloud" << std::endl;
     if (!_getCloud           (in, args, out)) return false;
 
     return true;
@@ -39,11 +36,20 @@ bool VanillaTracker::triangulate(const Input& in, Output& out) const
 
 bool VanillaTracker::_computeFundamental(const Input& in, Args& args, Output& out) const
 {
-    static const int min_inliers = 20;
+    static const int min_inliers = 100;
+
+    assert(in.pts1.size() == in.pts2.size());
     int num_points = in.pts1.size();
+
+    if (num_points == 0)
+    {
+        if (DEBUG) printf("[fundamental]: received no input points\n");
+        return false;
+    }
 
     double maxVal;
     cv::minMaxIdx(in.pts1, 0, &maxVal);
+    cv::minMaxIdx(in.pts2, 0, &maxVal);
     args.mask = std::vector<uchar>(num_points);
     out.fundamental = findFundamentalMat(in.pts1, in.pts2, cv::FM_RANSAC, 0.006 * maxVal, 0.99, args.mask);
 
@@ -51,13 +57,13 @@ bool VanillaTracker::_computeFundamental(const Input& in, Args& args, Output& ou
 
     if (out.fundamental.empty())
     {
-        printf("[fundamental]: fundamental matrix empty\n");
+        if (DEBUG) printf("[fundamental]: fundamental matrix empty\n");
         return false;
     }
 
     if (num_points < min_inliers)
     {
-        printf("[fundamental]: not enough inliers: %d/%d\n", num_points, min_inliers);
+        if (DEBUG) printf("[fundamental]: not enough inliers: %d/%d\n", num_points, min_inliers);
         return false;
     }
 
@@ -74,14 +80,16 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
                                                   1.0,  0.0,  0.0,
                                                   0.0,  0.0,  1.0);
 
+    static const double min_determinant = 1e-6;
+
     // Assume same camera
     cv::Mat camera_matrix = in.camera.matrix();
     out.essential = camera_matrix.t() * out.fundamental * camera_matrix;
 
-    // Keep this......?
-    if (std::abs(determinant(out.essential)) > 1e-4)
+    double e_determinant = determinant(out.essential);
+    if (std::abs(e_determinant) > min_determinant)
     {
-        printf("[essential]: expected determinant of 0, received: %f", determinant(out.essential));
+        if (DEBUG) printf("[essential]: expected determinant near 0, received: %f", e_determinant);
         return false;
     }
 
@@ -103,9 +111,9 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
             // NOTE:
             // This doesn't always work for some reason...
             // Sometimes we still get a rotation with -1
-            out.essential = -out.essential;
-            svd = cv::SVD(out.essential);
-            // svd.vt.row(2) = -svd.vt.row(2);
+            // out.essential = -out.essential;
+            // svd = cv::SVD(out.essential);
+            svd.vt.row(2) = -svd.vt.row(2);
         }
 
         cv::Mat r1 =  svd.u *   W   * svd.vt;
@@ -144,15 +152,10 @@ bool VanillaTracker::_computeEssential(const Input& in, Args& args, Output& out)
 
 bool VanillaTracker::_undistortPoints(const Input& in, Args& args, Output& out) const
 {
-    // cv::undistortPoints(args.inliers1, args.undistortedPts1, in.camera.matrix(), in.camera.distortion());
-    // cv::undistortPoints(args.inliers2, args.undistortedPts2, in.camera.matrix(), in.camera.distortion());
+    cv::undistortPoints(args.inliers1, args.undistortedPts1, in.camera.matrix(), in.camera.distortion());
+    cv::undistortPoints(args.inliers2, args.undistortedPts2, in.camera.matrix(), in.camera.distortion());
 
     return true;
-}
-
-bool VanillaTracker::_triangulate(const Input& in, Args& args, Output& out) const
-{
-    return false;
 }
 
 /**
@@ -204,16 +207,15 @@ cv::Mat_<double> VanillaTracker::_iterativeTriangulate(const cv::Point3d& u, con
         wi1 = p2x1;
         wi2 = p2x2;
         
-        //reweight equations and solve
         cv::Matx43d A((u.x*P1(2,0)-P1(0,0))/wi1, (u.x*P1(2,1)-P1(0,1))/wi1, (u.x*P1(2,2)-P1(0,2))/wi1,     
                       (u.y*P1(2,0)-P1(1,0))/wi1, (u.y*P1(2,1)-P1(1,1))/wi1, (u.y*P1(2,2)-P1(1,2))/wi1,     
                       (v.x*P2(2,0)-P2(0,0))/wi2, (v.x*P2(2,1)-P2(0,1))/wi2, (v.x*P2(2,2)-P2(0,2))/wi2, 
                       (v.y*P2(2,0)-P2(1,0))/wi2, (v.y*P2(2,1)-P2(1,1))/wi2, (v.y*P2(2,2)-P2(1,2))/wi2);
         
-        cv::Mat_<double> B = (cv::Mat_<double>(4,1) <<    -(u.x * P1(2,3) - P1(0,3)) / wi1,
-                                                          -(u.y * P1(2,3) - P1(1,3)) / wi1,
-                                                          -(v.x * P2(2,3) - P2(0,3)) / wi2,
-                                                          -(v.y * P2(2,3) - P2(1,3)) / wi2);
+        cv::Mat_<double> B = (cv::Mat_<double>(4,1) << -(u.x * P1(2,3) - P1(0,3)) / wi1,
+                                                       -(u.y * P1(2,3) - P1(1,3)) / wi1,
+                                                       -(v.x * P2(2,3) - P2(0,3)) / wi2,
+                                                       -(v.y * P2(2,3) - P2(1,3)) / wi2);
         
         solve(A, B, X_, cv::DECOMP_SVD);
         X(0) = X_(0);
@@ -233,7 +235,7 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
     static cv::Rect RotationROI     = cv::Rect(0, 0, 3, 3);
     static cv::Rect TranslationROI  = cv::Rect(3, 0, 1, 3);
     static const double min_percent = 0.75;
-    static const double min_error   = 10.0;
+    static const double min_error   = 1.0;
 
     cv::Mat P1 = NoProjection.clone();
     int num_points = args.inliers1.size();
@@ -309,18 +311,8 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
                 }
             }
 #else
-            int in_front = 0;
-            double error_total = 0.0;
             cv::Mat camera     = in.camera.matrix();
             cv::Mat camera_inv = camera.inv();
-            // std::cout << "Camera:" << std::endl;
-            // std::cout << camera << std::endl;
-            // std::cout << "Camera Inverse:" << std::endl;
-            // std::cout << camera_inv << std::endl;
-            // std::cout << "Translation: " << translation << std::endl;
-            // std::cout << "Rotation: " << rotation << std::endl;
-            // std::cout << "Projection: " << P2 << std::endl;
-            // std::cout << std::endl;
 
             cv::Mat_<double> KP1 = camera * P1;
             cv::Mat_<double> KP2 = camera * P2;
@@ -332,15 +324,12 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
                                                KP2(1, 0), KP2(1, 1), KP2(1, 2), KP2(1, 3),
                                                KP2(2, 0), KP2(2, 1), KP2(2, 2), KP2(2, 3));
 
+            int in_front = 0;
+            double error_total = 0.0;
             for (int k = 0; k < num_points; ++k)
             {
                 cv::Point2d pt1 = args.inliers1[k];
                 cv::Point2d pt2 = args.inliers2[k];
-
-                // std::cout << "Point 1:" << std::endl;
-                // std::cout << pt1 << std::endl;
-                // std::cout << "Point 2:" << std::endl;
-                // std::cout << pt2 << std::endl;
 
                 cv::Point3d u(pt1.x, pt1.y, 1.0);
                 cv::Point3d v(pt2.x, pt2.y, 1.0);
@@ -349,33 +338,16 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
                 cv::Mat_<double> v_3d    = camera_inv * cv::Mat(v);
                 cv::Mat_<double> pt_3d   = _iterativeTriangulate(u, KP1x34d, v, KP2x34d);
 
-                // std::cout << "Left:" << std::endl;
-                // std::cout << u_3d << std::endl;
-
-                // std::cout << "Right:" << std::endl;
-                // std::cout << v_3d << std::endl;
-
-                // std::cout << "Best:" << std::endl;
-                // std::cout << pt_3d << std::endl;
-
-                cv::Mat_<double> proj_pt1 = camera * P1 * pt_3d;// (cv::Mat_<double>(4, 1) << u_3d(0),u_3d(1),u_3d(2),1);
+                cv::Mat_<double> proj_pt1 = camera * P1 * pt_3d;
 
                 if (Util::feq(proj_pt1(2), 0.0)) continue;
                 cv::Point2d img_pt1(proj_pt1(0) / proj_pt1(2), proj_pt1(1) / proj_pt1(2));
-                // std::cout << "Projection:" << std::endl;
-                // std::cout << proj_pt << std::endl;
-
-                // std::cout << "Guess:" << std::endl;
-                // std::cout << img_pt1 << std::endl;
-
-                // std::cout << "Actual:" << std::endl;
-                // std::cout << pt1 << std::endl;
 
                 double error = norm(img_pt1 - pt1);//(norm(u_3d - pt_3d) + norm(v_3d - pt_3d)) / 2.0;
                 error_total += error;
 
                 bool is_in_front  = pt_3d(2) > 0.0;
-                bool is_low_error = error < 2 * min_error;
+                bool is_low_error = error < min_error;
 
                 in_front += is_in_front;
 
@@ -392,28 +364,23 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
             const double front_percent = ((double)(in_front)) / std::max(1, num_points);
             const double error_avg     = error_total / std::max(1, num_points);
 
-            // std::cout << (front_percent * 100.0) << "%" << " " << error_avg << std::endl;
-
             if (front_percent >= min_percent && error_avg < min_error)
             {
                 out.rotation = rotation.clone();
                 out.translation = translation.clone();
                 out.visible_percent = front_percent;
                 out.avg_reprojection_error = error_avg;
-                // std::cout << "Uh, returning true.....?" << std::endl;
-                // cv::waitKey();
                 return true;
             }
             else
             {
                 out.points.clear();
             }
-            // std::cout << std::endl;
-            // cv::waitKey();
 #endif
         }
     }
-    // std::cout << std::endl;
+
+    if (DEBUG) printf("[get cloud]: No transformation satisfied the constraints.\n");
 
     return false;
 }

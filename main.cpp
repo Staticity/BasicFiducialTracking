@@ -4,9 +4,8 @@
 
 #include "Util.hpp"
 #include "CameraData.hpp"
-#include "FlowMatcher.hpp"
+#include "HybridMatcher.hpp"
 #include "VanillaTracker.hpp"
-#include "CameraData.hpp"
 
 using namespace std;
 using namespace cv;
@@ -44,7 +43,7 @@ int main(int argc, char** argv)
     Mat source, query;
     // Mat query = imread("images/Lenna.png");
 
-    FlowMatcher matcher;
+    HybridMatcher matcher;
     VanillaTracker tracker;
 
     Tracker::Input in(camera);
@@ -55,64 +54,102 @@ int main(int argc, char** argv)
     std::vector<DMatch>  matches;
     vc >> query;
 
+    // int total = 0;
+    // int good = 0;
     while (vc.isOpened())
     {
         vc >> source;
 
         feat1.clear();
         feat2.clear();
+        desc1 = Mat();
+        desc2 = Mat();
         matches.clear();
         bool success = matcher.match(query, source, feat1, feat2, desc1, desc2, matches);
+        query = source.clone();
 
+        // ++total;
         if (success)
         {
+            Mat drawing = Mat::zeros(source.size(), CV_8UC3);
             pts1.clear();
             pts2.clear();
 
             Util::toPoints(feat1, feat2, matches, pts1, pts2);
+            assert(pts1.size() == pts2.size());
 
             vector<uchar> mask(pts1.size());
             Mat homography = findHomography(pts1, pts2, CV_RANSAC, 2, mask);
 
-            Util::retain(vector<Point2d>(pts1), mask, pts1);
-            Util::retain(vector<Point2d>(pts2), mask, pts2);
+            vector<Point2d> good_pts1;
+            vector<Point2d> good_pts2;
+            Util::retain(pts1, mask, good_pts1);
+            Util::retain(pts2, mask, good_pts2);
 
-            for (int i = 0; i < pts1.size(); ++i)
+            for (int i = 0; i < good_pts1.size(); ++i)
             {
-                arrowedLine(source, pts2[i], pts1[i], Scalar(0, 255, 0), 1);
+                arrowedLine(source, good_pts2[i], good_pts1[i], Scalar(0, 255, 0), 1);
             }
 
-            in.pts1 = pts1;
-            in.pts2 = pts2;
+            in.pts1 = good_pts1;
+            in.pts2 = good_pts2;
 
             Tracker::Output out;
-            success = tracker.triangulate(in, out);
-            std::cout << (success ? "true" : "false") << std::endl;
-            std::cout << out.points.size() << std::endl;
-            // std::cout << out.rotation << std::endl;
-            // std::cout << out.translation << std::endl;
+            // success = tracker.triangulate(in, out);
 
-            // if (success)
+            // if (out.points.size() > 0)
             // {
-            //     std::vector<Point2d> matched2d;
-            //     std::vector<Point3d> matched3d;
-            //     for (int i = 0; i < out.points.size(); ++i)
+            //     // ++good;
+            //     // cout << good << "/" << total << endl;
+            //     // printf("Tracking was a %s\n", (success ? "SUCCESS" : "FAILURE"));
+            //     double minV = out.points[0].pt.z;
+            //     double maxV = minV;
+
+            //     int num_bad = minV > 1.0;
+            //     for (int i = 1; i < out.points.size(); ++i)
             //     {
-            //         matched2d.push_back(pts2[out.points[i].index]);
-            //         matched3d.push_back(out.points[i].pt);
-            //         cout << matched3d[i].x << " " << matched3d[i].y << " " << matched3d[i].z << endl;
-            //         // Scalar color = source.at<Scalar>(matched2d[i].y, matched2d[i].x);
-            //         // cout << color[0] << " " << color[1] << " " << color[2] << endl;
+            //         double z = out.points[i].pt.z;
+            //         minV = (z < minV) ? z : minV;
+            //         maxV = (z > maxV) ? z : maxV;
+            //         num_bad += z > 1.0;
             //     }
-            //     waitKey();
+
+            //     for (int i = 0; i < out.points.size() && !Util::feq(maxV - minV, 0.0); ++i)
+            //     {
+            //         int j = out.points[i].index;
+            //         double z = out.points[i].pt.z;
+            //         z = max(minV, min(z, maxV));
+            //         double s = 1.0 - ( (z - minV) / (maxV - minV));
+            //         assert(s <= 1.0 && s >= 0.0);
+            //         Scalar r = Scalar(0, 0, 255);
+            //         Scalar g = Scalar(0, 255, 0);
+            //         Scalar c = r * s + g * (1 - s);
+            //         // Scalar c = Scalar(255 * (1 - s), 255, 255);
+            //         circle(drawing, good_pts2[j], 1, c, CV_FILLED);
+            //     }
+                // cvtColor(drawing, drawing, CV_HSV2BGR);
+
+                // printf("Num in cloud: %lu/%lu\nVisibility: %f%%\nAverage error: %f\n", out.points.size(), pts1.size(), out.visible_percent * 100.0, out.avg_reprojection_error);
+                // printf("Range of z: [%f, %f] with %d/%lu considered bad\n\n", minV, maxV, num_bad, out.points.size());
+                // cout << "Rotation:\n" << endl;
+                // cout << out.rotation << endl << endl;
+                // cout << "Translation:" << out.translation << endl;
+                // cout << endl;
+                // imshow("drawing", drawing);
+                // if (maxV > 1.0)
+                // {
+                    // cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+                    // waitKey();
+                // }
             // }
+
+            // imshow("drawing", drawing);
         }
         // else 
         {
-            imshow("drawing", source);
+            imshow("source", source);
         }
 
-        query = source.clone();
         char c = waitKey(20);
         if      (c ==  27) break;
     }
