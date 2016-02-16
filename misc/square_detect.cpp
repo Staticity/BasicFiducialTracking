@@ -558,7 +558,7 @@ int main(int argc, char** argv)
 
                 // draw_sorted_corners(image, quad);
                 // draw_image_in_quad(image, quad, image.clone());
-                // draw_image_in_quad_rec(image, quad, 3);
+                //draw_image_in_quad_rec(image, quad, 3);
 
                 Mat rot, trans;
                 get_square_pose(quad, camera_matrix, distortion_coeff, rot, trans);

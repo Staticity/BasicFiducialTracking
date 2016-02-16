@@ -5,7 +5,7 @@
 #include <core.hpp>
 #include <vector>
 
-#include "CameraData.hpp"
+#include "Camera.hpp"
 
 class Tracker
 {
@@ -22,14 +22,14 @@ public:
 
     struct Input
     {
-        Input(CameraData cam) : camera(cam)
+        Input(Camera cam) : camera(cam)
         {}
         // std::vector<cv::KeyPoint>  feat1;
         // std::vector<cv::KeyPoint>  feat2;
         // std::vector<cv::DMatch>    matches;
         std::vector<cv::Point2d>   pts1;
         std::vector<cv::Point2d>   pts2;
-        CameraData                 camera;
+        Camera                 camera;
     };
 
     struct Output

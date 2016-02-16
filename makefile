@@ -1,7 +1,7 @@
 CC          = c++
 LFLAGS      = 
 CFLAGS      = -c 
-OBJS        =  CameraData.o Tracker.o Matcher.o VanillaTracker.o FlowMatcher.o VanillaMatcher.o HybridMatcher.o main.o
+OBJS        =  Camera.o Tracker.o Matcher.o VanillaTracker.o FlowMatcher.o VanillaMatcher.o HybridMatcher.o main.o
 INCLUDE_DIR = -I/usr/local/include/opencv -I/usr/local/include/opencv2
 LIBRARIES   = -lopencv_calib3d     \
               -lopencv_core        \
@@ -26,14 +26,17 @@ LIBRARIES   = -lopencv_calib3d     \
 run.o: main.o
 	$(CC) $(LFLAGS) $(OBJS) -o run.o $(INCLUDE_DIR) $(LIBRARIES)
 
-main.o: CameraData.o VanillaTracker.o HybridMatcher.o
+main.o: Camera.o VanillaTracker.o HybridMatcher.o
 	$(CC) $(CFLAGS) main.cpp $(INCLUDE_DIR)
 
-correspondences.o: CameraData.o misc/correspondences.cpp
-	$(CC) $(LFLAGS) misc/correspondences.cpp CameraData.o -o correspondences.o $(INCLUDE_DIR) $(LIBRARIES)
+correspondences.o: Camera.o misc/correspondences.cpp
+	$(CC) $(LFLAGS) misc/correspondences.cpp Camera.o -o correspondences.o $(INCLUDE_DIR) $(LIBRARIES)
 
 square_detect.o: misc/square_detect.cpp
 	$(CC) $(LFLAGS) misc/square_detect.cpp -o square_detect.o $(INCLUDE_DIR) $(LIBRARIES)
+
+snap_pictures.o:
+	$(CC) $(LFLAGS) misc/snap_pictures.cpp -o snap_pictures.o $(INCLUDE_DIR) $(LIBRARIES)
 
 video_stream.o:
 	$(CC) $(LFLAGS) misc/video_stream.cpp -o video_stream.o $(INCLUDE_DIR) $(LIBRARIES)
@@ -44,7 +47,7 @@ Util.o:
 VanillaTracker.o: Util.o Tracker.o VanillaTracker.cpp
 	$(CC) $(CFLAGS) VanillaTracker.hpp VanillaTracker.cpp $(INCLUDE_DIR)
 
-Tracker.o: CameraData.o Tracker.cpp
+Tracker.o: Camera.o Tracker.cpp
 	$(CC) $(CFLAGS) Tracker.hpp Tracker.cpp $(INCLUDE_DIR)
 
 FlowMatcher.o: Matcher.o FlowMatcher.cpp
@@ -59,8 +62,8 @@ HybridMatcher.o: VanillaMatcher.o FlowMatcher.o HybridMatcher.cpp
 Matcher.o: Matcher.cpp
 	$(CC) $(CFLAGS) Matcher.hpp Matcher.cpp $(INCLUDE_DIR)
 
-CameraData.o: CameraData.cpp
-	$(CC) $(CFLAGS) CameraData.hpp CameraData.cpp $(INCLUDE_DIR)
+Camera.o: Camera.cpp
+	$(CC) $(CFLAGS) Camera.hpp Camera.cpp $(INCLUDE_DIR)
 
 clean:
 	rm -f *.o

@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <iostream>
 
-#include "../CameraData.hpp"
+#include "../Camera.hpp"
 
 using namespace std;
 using namespace cv;
@@ -160,7 +160,7 @@ int main(int argc, char** argv)
     int video_height            = atoi(argv[3]);
 
 
-    CameraData cam(calibration_filepath);
+    Camera cam(calibration_filepath);
     cam.resize(Size(video_width, video_height));
 
     VideoCapture vc(0);

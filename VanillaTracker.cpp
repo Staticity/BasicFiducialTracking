@@ -165,19 +165,19 @@ bool VanillaTracker::_undistortPoints(const Input& in, Args& args, Output& out) 
 cv::Mat_<double> VanillaTracker::_triangulatePoint(const cv::Point3d& u, const cv::Matx34d& P1,
                                                    const cv::Point3d& v, const cv::Matx34d& P2) const
 {
-    cv::Matx43d A(u.x * P1(2,0) - P1(0,0), u.x * P1(2,1) - P1(0,1), u.x * P1(2,2) - P1(0,2),      
-                  u.y * P1(2,0) - P1(1,0), u.y * P1(2,1) - P1(1,1), u.y * P1(2,2) - P1(1,2),      
-                  v.x * P2(2,0) - P2(0,0), v.x * P2(2,1) - P2(0,1), v.x * P2(2,2) - P2(0,2),   
-                  v.y * P2(2,0) - P2(1,0), v.y * P2(2,1) - P2(1,1), v.y * P2(2,2) - P2(1,2));
+    cv::Matx43d A(u.x * P1(2, 0) - P1(0, 0), u.x * P1(2, 1) - P1(0, 1), u.x * P1(2, 2) - P1(0, 2),      
+                  u.y * P1(2, 0) - P1(1, 0), u.y * P1(2, 1) - P1(1, 1), u.y * P1(2, 2) - P1(1, 2),      
+                  v.x * P2(2, 0) - P2(0, 0), v.x * P2(2, 1) - P2(0, 1), v.x * P2(2, 2) - P2(0, 2),   
+                  v.y * P2(2, 0) - P2(1, 0), v.y * P2(2, 1) - P2(1, 1), v.y * P2(2, 2) - P2(1, 2));
 
-    cv::Matx41d B(-(u.x*P1(2,3) - P1(0,3)),
-                  -(u.y*P1(2,3) - P1(1,3)),
-                  -(v.x*P2(2,3) - P2(0,3)),
-                  -(v.y*P2(2,3) - P2(1,3)));
+    cv::Matx41d B(-(u.x * P1(2, 3) - P1(0, 3)),
+                  -(u.y * P1(2, 3) - P1(1, 3)),
+                  -(v.x * P2(2, 3) - P2(0, 3)),
+                  -(v.y * P2(2, 3) - P2(1, 3)));
 
     cv::Mat_<double> X;
     cv::solve(A, B, X, cv::DECOMP_SVD);
-    
+
     return X;
 }
 
@@ -238,82 +238,25 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
     static const double min_percent = 0.75;
     static const double min_error   = 1.0;
 
-    cv::Mat P1 = NoProjection.clone();
+    cv::Mat P1     = NoProjection.clone();
+    cv::Mat K      = in.camera.matrix();
+    cv::Mat K_inv  = K.inv();
+    cv::Mat KP1    = K * P1;
     int num_points = args.inliers1.size();
 
     for (int i = 0; i < args.rotations.size(); ++i)
     {
-        cv::Mat rotation    = args.rotations[i];
+        cv::Mat rotation = args.rotations[i];
         for (int j = 0; j < args.translations.size(); ++j)
         {
             cv::Mat translation = args.translations[j];
 
+            // Verified correct copy
             cv::Mat P2 = cv::Mat::zeros(3, 4, P1.type());
             rotation.copyTo(P2(RotationROI));
             translation.copyTo(P2(TranslationROI));
-#if 0
 
-            cv::Mat pts_homog_3d(1, num_points, CV_64FC4);
-            std::vector<cv::Point3d> pts_3d;
-            cv::triangulatePoints(P1, P2, args.undistortedPts1.reshape(1, 2), args.undistortedPts2.reshape(1, 2), pts_homog_3d);
-            cv::convertPointsFromHomogeneous(pts_homog_3d.reshape(4, 1), pts_3d);
-
-
-            // NOTE:
-            // This assumes that no points have w = 0, since
-            // as of 2/13/2016 convertPointsFromHomogenous
-            // doesn't zero out the vector if w = 0.
-            std::vector<unsigned char> status(num_points);
-            for (int k = 0; k < num_points; ++k)
-            {
-                status[k] = (pts_3d[k].z > 0.0);
-            }
-
-            int num_in_front  = cv::countNonZero(status);
-            double front_percent = ((double)(num_in_front)) / std::max(1, num_points);
-
-            // std::cout << front_percent << std::endl;
-
-            // Not enough points in front
-            if (front_percent < min_percent) continue;
-
-            cv::Vec3d rvec, tvec;
-            Rodrigues(P1(RotationROI), rvec);
-            tvec = P1(TranslationROI);
-
-            std::vector<cv::Point2d> reprojected_pts1;
-            cv::projectPoints(pts_3d, rvec, tvec, in.camera.matrix(), in.camera.distortion(), reprojected_pts1);
-
-            const double error_total = cv::norm(cv::Mat(reprojected_pts1), cv::Mat(args.inliers1), cv::NORM_L2); 
-            const double error_avg   = error_total / std::max((int)reprojected_pts1.size(), 1);
-
-            if (error_avg > min_error) continue;
-
-            for (int k = 0; k < num_points; ++k)
-            {
-                const double error = cv::norm(args.inliers1[k] - reprojected_pts1[k]);
-                status[k] &= (error < 2 * min_error);
-            }
-
-            out.rotation               = rotation;
-            out.translation            = translation;
-            out.visible_percent        = front_percent;
-            out.avg_reprojection_error = error_avg;
-
-            out.points.clear();
-            for (int k = 0; k < num_points; ++k)
-            {
-                if (status[k])
-                {
-                    out.points.push_back(CloudPoint());
-                    int out_index = out.points.size() - 1;
-                    out.points[out_index].pt = pts_3d[k];
-                    out.points[out_index].index = args.indices[k];
-                }
-            }
-#else
-            cv::Mat camera     = in.camera.matrix();
-            cv::Mat camera_inv = camera.inv();
+            // cv::Mat KP2 = K * P2;
 
             int in_front = 0;
             double error_total = 0.0;
@@ -324,20 +267,41 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
 
                 cv::Point3d u(pt1.x, pt1.y, 1.0);
                 cv::Point3d v(pt2.x, pt2.y, 1.0);
-                
-                cv::Mat_<double> u_3d  = camera_inv * cv::Mat(u);
-                cv::Mat_<double> v_3d  = camera_inv * cv::Mat(v);
 
-                u.x = u_3d(0);
-                u.y = u_3d(1);
-                u.z = u_3d(2);
+                assert(Util::feq(pt1.x, u.x));
+                assert(Util::feq(pt1.y, u.y));
+                assert(Util::feq(pt2.x, v.x));
+                assert(Util::feq(pt2.y, v.y));
+
+                cv::Mat_<double> u_norm = K_inv * cv::Mat(u);
+                cv::Mat_<double> v_norm = K_inv * cv::Mat(v);
+
+                u.x = u_norm(0);
+                u.y = u_norm(1);
+                u.z = u_norm(2);
                 
-                v.x = v_3d(0);
-                v.y = v_3d(1);
-                v.z = v_3d(2);
+                v.x = v_norm(0);
+                v.y = v_norm(1);
+                v.z = v_norm(2);
+
+                assert(Util::feq(u.x, u_norm(0)));
+                assert(Util::feq(u.y, u_norm(1)));
+                assert(Util::feq(u.z, u_norm(2)));
+
+                assert(Util::feq(v.x, v_norm(0)));
+                assert(Util::feq(v.y, v_norm(1)));
+                assert(Util::feq(v.z, v_norm(2)));
 
                 cv::Mat_<double> pt_3d = _iterativeTriangulate(u, P1, v, P2);
-                cv::Mat_<double> proj_pt1 = camera * P1 * pt_3d;
+
+                std::cout << K << std::endl;
+                std::cout << K_inv << std::endl;
+                std::cout << pt_3d(0) << std::endl;
+                std::cout << u << std::endl;
+                std::cout << v << std::endl << std::endl;
+
+
+                cv::Mat_<double> proj_pt1 = KP1 * pt_3d;
 
                 if (Util::feq(proj_pt1(2), 0.0)) continue;
                 cv::Point2d img_pt1(proj_pt1(0) / proj_pt1(2), proj_pt1(1) / proj_pt1(2));
@@ -363,7 +327,7 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
             const double front_percent = ((double)(in_front)) / std::max(1, num_points);
             const double error_avg     = error_total / std::max(1, num_points);
 
-            std::cout << front_percent * 100.0 << "%\t" << error_avg << std::endl;
+            // std::cout << front_percent * 100.0 << "%\t" << error_avg << std::endl;
 
             if (front_percent >= min_percent && error_avg < min_error)
             {
@@ -377,7 +341,6 @@ bool VanillaTracker::_getCloud(const Input& in, Args& args, Output& out) const
             {
                 out.points.clear();
             }
-#endif
         }
     }
 

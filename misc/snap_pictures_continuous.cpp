@@ -7,29 +7,26 @@ using namespace cv;
 
 int main(int argc, char** argv)
 {
-    if (argc < 3)
+    if (argc < 4)
         return 0;
 
     string directory = argv[1];
-    int index = atoi(argv[2]);
+    int count        = atoi(argv[2]);
+    int delay        = atoi(argv[3]);
 
     if (directory[directory.size() - 1] != '/')
         directory += '/';
 
     Mat image;
-    VideoCapture vc(index);
+    VideoCapture vc(0);
 
     if (!vc.isOpened()) return 0;
 
-    int i = 0;
-    while (vc.isOpened())
+    for (int i = 0; i < count && vc.isOpened(); ++i)
     {
         vc >> image;
         imshow("image", image);
-        char c = waitKey(20);
-        if (c == ' ')
-            imwrite(directory + to_string(i++) + ".jpg", image);
-        else if (c == 27)
-            break;
+        imwrite(directory + to_string(i) + ".jpg", image);
+        waitKey(delay);
     }
 }

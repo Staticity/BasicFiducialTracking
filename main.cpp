@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "Util.hpp"
-#include "CameraData.hpp"
+#include "Camera.hpp"
 #include "HybridMatcher.hpp"
 #include "VanillaTracker.hpp"
 
@@ -31,10 +31,10 @@ int main(int argc, char** argv)
     int video_width             = atoi(argv[2]);
     int video_height            = atoi(argv[3]);
 
-    CameraData camera(calibration_filepath);
+    Camera camera(calibration_filepath);
     camera.resize(Size(video_width, video_height));
 
-    VideoCapture vc(0);
+    VideoCapture vc(1);
     vc.set(CV_CAP_PROP_FRAME_WIDTH, video_width);
     vc.set(CV_CAP_PROP_FRAME_HEIGHT, video_height);
 
