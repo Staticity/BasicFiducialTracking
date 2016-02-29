@@ -450,10 +450,10 @@ void draw_cube_with_pose(Mat& image,
         { 1.0,  1.0,  0.0f},
         { 1.0, -1.0,  0.0f},
         {-1.0, -1.0,  0.0f},
-        {-1.0,  1.0,  1.0f},
-        { 1.0,  1.0,  1.0f},
-        { 1.0, -1.0,  1.0f},
-        {-1.0, -1.0,  1.0f},
+        {-1.0,  1.0,  2.0f},
+        { 1.0,  1.0,  2.0f},
+        { 1.0, -1.0,  2.0f},
+        {-1.0, -1.0,  2.0f},
     };
 
     Mat cube_object_coordinates = Mat(8, 3, CV_64F, cube_points);
@@ -534,7 +534,8 @@ int main(int argc, char** argv)
     VideoCapture vc(index);
     vc.set(CV_CAP_PROP_FRAME_WIDTH, width);
     vc.set(CV_CAP_PROP_FRAME_HEIGHT, height);
-    // vc.set(CV_CAP_PROP_FPS, 30);
+    vc.set(CV_CAP_PROP_FPS, 60);
+    
 
     if (!vc.isOpened()) return 0;
 
@@ -558,14 +559,14 @@ int main(int argc, char** argv)
 
                 // draw_sorted_corners(image, quad);
                 // draw_image_in_quad(image, quad, image.clone());
-                //draw_image_in_quad_rec(image, quad, 3);
+                 draw_image_in_quad_rec(image, quad, 3);
 
                 Mat rot, trans;
                 get_square_pose(quad, camera_matrix, distortion_coeff, rot, trans);
                 // cout << "Rotation\n" << rot << endl;
                 // cout << "Translation\n" << trans << endl << endl;
 
-                draw_cube_with_pose(image, rot, trans, camera_matrix, distortion_coeff);
+               //  draw_cube_with_pose(image, rot, trans, camera_matrix, distortion_coeff);
             }
         }
 
