@@ -27,6 +27,9 @@ LIBRARIES   = -lopencv_calib3d     \
 main.o: Util.o Camera.o Features.o MultiView.o
 	$(CC) $(LFLAGS) $(MAIN_OBJS) main.cpp -o main.o $(INCLUDE_DIR) $(LIBRARIES)
 
+two_view.o: Util.o Camera.o Features.o MultiView.o
+	$(CC) $(LFLAGS) $(MAIN_OBJS) two_view.cpp -o two_view.o $(INCLUDE_DIR) $(LIBRARIES)
+
 draw_matches.o: Util.o Features.o
 	$(CC) $(LFLAGS) $(DRAW_OBJS) draw_matches.cpp -o draw_matches.o $(INCLUDE_DIR) $(LIBRARIES)
 

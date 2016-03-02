@@ -6,10 +6,11 @@
 #include "Camera.hpp"
 #include "Util.hpp"
 
-void fundamental(const std::vector<cv::Point2d>&  pts1   ,
-                 const std::vector<cv::Point2d>&  pts2   ,
-                 cv::Mat&                         F      ,
-                 std::vector<unsigned char>&      inliers)
+void fundamental(
+    const std::vector<cv::Point2d>& pts1,
+    const std::vector<cv::Point2d>& pts2,
+    cv::Mat& F,
+    std::vector<unsigned char>& inliers)
 {
     double maxV1, maxV2;
     cv::minMaxIdx(pts1, 0, &maxV1);
@@ -21,10 +22,11 @@ void fundamental(const std::vector<cv::Point2d>&  pts1   ,
     F = cv::findFundamentalMat(pts1, pts2, cv::FM_RANSAC, magic * maxV, confidence, inliers);
 }
 
-void essential(const Camera&  c1,
-               const Camera&  c2,
-               const cv::Mat& F ,
-               cv::Mat&       E )
+void essential(
+    const Camera& c1,
+    const Camera& c2,
+    const cv::Mat& F,
+    cv::Mat& E)
 {
     static cv::Mat W = (cv::Mat_<double>(3, 3) << 0, -1,  0,
                                                   1,  0,  0,
@@ -54,9 +56,10 @@ void essential(const Camera&  c1,
     E = u * D * vt;
 }
 
-void getRTfromE(const cv::Mat&        E,
-                std::vector<cv::Mat>& R,
-                std::vector<cv::Mat>& T)
+void getRTfromE(
+    const cv::Mat& E,
+    std::vector<cv::Mat>& R,
+    std::vector<cv::Mat>& T)
 {
     static cv::Mat W = (cv::Mat_<double>(3, 3) << 0, -1,  0,
                                                   1,  0,  0,
@@ -86,11 +89,12 @@ void getRTfromE(const cv::Mat&        E,
     T.push_back(t2);
 }
 
-void triangulate(const cv::Point2d&      x1,
-                 const cv::Mat_<double>& P1,
-                 const cv::Point2d&      x2,
-                 const cv::Mat_<double>& P2,
-                 cv::Point3d&             X)
+void triangulate(
+    const cv::Point2d& x1,
+    const cv::Mat_<double>& P1,
+    const cv::Point2d& x2,
+    const cv::Mat_<double>& P2,
+    cv::Point3d& X)
 {
     cv::Matx43d A;
     for (int i = 0; i <= 2; ++i)
@@ -120,11 +124,12 @@ void triangulate(const cv::Point2d&      x1,
     X = cv::Point3d(_X(0), _X(1), _X(2));
 }
 
-void triangulate(const std::vector<cv::Point2d>& pts1,
-                 const cv::Mat&                  P1  ,
-                 const std::vector<cv::Point2d>& pts2,
-                 const cv::Mat&                  P2  ,
-                 std::vector<cv::Point3d>&       X   )
+void triangulate(
+    const std::vector<cv::Point2d>& pts1,
+    const cv::Mat& P1,
+    const std::vector<cv::Point2d>& pts2,
+    const cv::Mat& P2,
+    std::vector<cv::Point3d>& X)
 {
     assert(pts1.size() == pts2.size());
 
