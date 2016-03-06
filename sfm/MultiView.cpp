@@ -239,7 +239,9 @@ namespace MultiView
         const cv::Mat& projection,
         std::vector<cv::Point2d>& coordinates)
     {
-        for (int i = 0; i < points.size(); ++i)
+        int n = points.size();
+        coordinates = std::vector<cv::Point2d>(n);
+        for (int i = 0; i < n; ++i)
         {
             project(points[i], projection, coordinates[i]);
         }
