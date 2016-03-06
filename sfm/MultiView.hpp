@@ -7,17 +7,6 @@
 
 class Camera;
 
-namespace cv
-{
-    template<>
-    struct Point_<double>;
-
-    template<>
-    struct Point3_<double>;
-    
-    class Mat;
-}
-
 namespace MultiView
 {
     void fundamental(
@@ -27,15 +16,20 @@ namespace MultiView
         std::vector<unsigned char>& inliers);
 
     void essential(
+        const cv::Mat& F,
         const Camera& c1,
         const Camera& c2,
-        const cv::Mat& F,
         cv::Mat& E);
 
-    void getRTfromE(
+    void get_rotation_and_translation(
         const cv::Mat& E,
         std::vector<cv::Mat>& R,
         std::vector<cv::Mat>& T);
+
+    void get_projection(
+        const cv::Mat& R,
+        const cv::Mat& T,
+        cv::Mat& P);
 
     void triangulate(
         const cv::Point2d& x1,
@@ -49,7 +43,36 @@ namespace MultiView
         const cv::Mat& P1,
         const std::vector<cv::Point2d>& pts2,
         const cv::Mat& P2,
-        std::vector<cv::Point3d>& X);
+        std::vector<cv::Point3d>& points);
+
+    void triangulate(
+        const std::vector<cv::Point2d>& pts1,
+        const std::vector<cv::Point2d>& pts2,
+        const cv::Mat& rotation,
+        const cv::Mat& translation,
+        std::vector<cv::Point3d>& points);
+
+    void project(
+        const cv::Point3d& point,
+        const cv::Mat& rotation,
+        const cv::Mat& translation,
+        cv::Point2d& coordinate);
+
+    void project(
+        const cv::Point3d& point,
+        const cv::Mat& projection,
+        cv::Point2d& coordinate);
+    
+    void project(
+        const std::vector<cv::Point3d>& points,
+        const cv::Mat& rotation,
+        const cv::Mat& translation,
+        std::vector<cv::Point2d>& coordinates);
+
+    void project(
+        const std::vector<cv::Point3d>& points,
+        const cv::Mat& projection,
+        std::vector<cv::Point2d>& coordinates);
 }
 
 #endif

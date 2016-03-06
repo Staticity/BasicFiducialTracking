@@ -7,9 +7,10 @@
 namespace Util
 {
     template <typename T, typename B>
-    void mask(const std::vector<T>& v,
-              const std::vector<B>& mask,
-              std::vector<T>&       kept)
+    void mask(
+        const std::vector<T>& v,
+        const std::vector<B>& mask,
+        std::vector<T>& kept)
     {
         assert(v.size() == mask.size());
 
