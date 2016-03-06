@@ -31,6 +31,12 @@ namespace MultiView
         const cv::Mat& T,
         cv::Mat& P);
 
+    void transform(
+        const cv::Point3d& point,
+        const cv::Mat_<double>& rotation,
+        const cv::Mat_<double>& translation,
+        cv::Point3d& transformed_point);
+
     void triangulate(
         const cv::Point2d& x1,
         const cv::Mat_<double>& P1,

@@ -114,6 +114,18 @@ namespace MultiView
         T.copyTo(P(cv::Rect(3, 0, 1, 3)));
     }
 
+    void transform(
+        const cv::Point3d& point,
+        const cv::Mat_<double>& rotation,
+        const cv::Mat_<double>& translation,
+        cv::Point3d& transformed_point)
+    {
+        cv::Mat_<double> pt = (cv::Mat_<double>(3, 1) << point.x, point.y, point.z);
+        cv::Mat_<double> new_pt = rotation * pt + translation;
+
+        transformed_point = cv::Point3d(new_pt(0), new_pt(1), new_pt(2));
+    }
+
     void triangulate(
         const cv::Point2d& x1,
         const cv::Mat_<double>& P1,
@@ -134,11 +146,6 @@ namespace MultiView
                       -(x1.y * P1(2, 3) - P1(1, 3)),
                       -(x2.x * P2(2, 3) - P2(0, 3)),
                       -(x2.y * P2(2, 3) - P2(1, 3)));
-
-        // cv::Matx43d A(x1.x * P1(2, 0) - P1(0, 0), x1.x * P1(2, 1) - P1(0, 1), x1.x * P1(2, 2) - P1(0, 2),      
-        //               x1.y * P1(2, 0) - P1(1, 0), x1.y * P1(2, 1) - P1(1, 1), x1.y * P1(2, 2) - P1(1, 2),      
-        //               x2.x * P2(2, 0) - P2(0, 0), x2.x * P2(2, 1) - P2(0, 1), x2.x * P2(2, 2) - P2(0, 2),   
-        //               x2.y * P2(2, 0) - P2(1, 0), x2.y * P2(2, 1) - P2(1, 1), x2.y * P2(2, 2) - P2(1, 2));
 
         cv::Mat_<double> _X;
         cv::solve(A, B, _X, cv::DECOMP_SVD);

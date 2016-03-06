@@ -60,7 +60,8 @@ int main(int argc, char** argv)
 
     int n = rotations.size();
     std::vector<std::vector<Point3d> > clouds(n);
-    std::vector<double> projection_error(n), in_front_percent(n);
+    std::vector<double> projection_error1(n), projection_error2(n);
+    std::vector<double> in_front_percent1(n), in_front_percent2(n);
     for (int i = 0; i < n; ++i)
     {
         Mat rotation = rotations[i];
@@ -75,6 +76,18 @@ int main(int argc, char** argv)
         MultiView::project(clouds[i], no_rotation, no_translation, projected_pts1);
         MultiView::project(clouds[i], rotation, translation, projected_pts2);
 
+        double proj_err1 = 0.0, proj_err2 = 0.0;
+        int in_front1 = 0, in_front2 = 0;
+        for (int j = 0; j < pts1.size(); ++j)
+        {
+            Point3d pt3d1, pt3d2;
+            pt3d1 = clouds[i];
+            MultiView::transform(pt3d1, rotation, translation, pt3d2);
 
+            in_front1 += pt3d1.z > 0.0;
+            in_front2 += pt3d2.z > 0.0;
+
+            
+        }
     }
 }
