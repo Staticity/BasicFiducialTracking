@@ -42,18 +42,29 @@ namespace MultiView
         const cv::Mat_<double>& P1,
         const cv::Point2d& x2,
         const cv::Mat_<double>& P2,
-        cv::Point3d& X);
+        cv::Point3d& point);
+    
+    void iterative_triangulate(
+        const cv::Point3d& u,
+        const cv::Matx34d& P1,
+        const cv::Point3d& v,
+        const cv::Matx34d& P2,
+        cv::Point3d& point);
 
     void triangulate(
         const std::vector<cv::Point2d>& pts1,
         const cv::Mat& P1,
+        const cv::Mat& K1,
         const std::vector<cv::Point2d>& pts2,
         const cv::Mat& P2,
+        const cv::Mat& K2,
         std::vector<cv::Point3d>& points);
 
     void triangulate(
         const std::vector<cv::Point2d>& pts1,
+        const cv::Mat& K1,
         const std::vector<cv::Point2d>& pts2,
+        const cv::Mat& K2,
         const cv::Mat& rotation,
         const cv::Mat& translation,
         std::vector<cv::Point3d>& points);
@@ -62,6 +73,7 @@ namespace MultiView
         const cv::Point3d& point,
         const cv::Mat& rotation,
         const cv::Mat& translation,
+        const cv::Mat& camera,
         cv::Point2d& coordinate);
 
     void project(
@@ -73,6 +85,7 @@ namespace MultiView
         const std::vector<cv::Point3d>& points,
         const cv::Mat& rotation,
         const cv::Mat& translation,
+        const cv::Mat& camera,
         std::vector<cv::Point2d>& coordinates);
 
     void project(

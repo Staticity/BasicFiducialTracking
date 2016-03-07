@@ -18,7 +18,7 @@ namespace Util
         {
             if (mask[i])
             {
-                kept[i].push_back(v[i]);
+                kept.push_back(v[i]);
             }
         }
     }

@@ -15,14 +15,21 @@ namespace MultiView
         cv::Mat& F,
         std::vector<unsigned char>& inliers)
     {
+        using namespace std;
         double maxV1, maxV2;
         cv::minMaxIdx(pts1, 0, &maxV1);
         cv::minMaxIdx(pts2, 0, &maxV2);
 
-        const double maxV = std::max(maxV2, maxV2);
-        const double magic      = 0.66;
+        const double maxV = std::max(maxV1, maxV2);
+        const double magic      = 0.006;
         const double confidence = 0.99;
-        F = cv::findFundamentalMat(pts1, pts2, cv::FM_RANSAC, magic * maxV, confidence, inliers);
+        F = cv::findFundamentalMat(
+            pts1,
+            pts2,
+            cv::FM_RANSAC,
+            magic * maxV,
+            confidence,
+            inliers);
     }
 
     void essential(
@@ -46,7 +53,7 @@ namespace MultiView
         assert(K2.rows == F.rows && F.cols == K1.rows);
         E = K2.t() * F * K1;
 
-        cv::Mat u, w, vt;
+        cv::Mat w, u, vt;
         cv::SVD::compute(E, w, u, vt);
 
         assert(u.cols == W.rows && W.cols == vt.rows);
@@ -72,10 +79,7 @@ namespace MultiView
                                                       1,  0,  0,
                                                       0,  0,  1);
 
-        static cv::Mat D = (cv::Mat_<double>(3, 3) << 1,  0,  0,
-                                                      0,  1,  0,
-                                                      0,  0,  0);
-        cv::Mat u, w, vt;
+        cv::Mat w, u, vt;
         cv::SVD::compute(E, w, u, vt);
 
         assert(u.cols == W.rows && W.rows == vt.cols);
@@ -120,7 +124,9 @@ namespace MultiView
         const cv::Mat_<double>& translation,
         cv::Point3d& transformed_point)
     {
-        cv::Mat_<double> pt = (cv::Mat_<double>(3, 1) << point.x, point.y, point.z);
+        cv::Mat_<double> pt = (cv::Mat_<double>(3, 1) << point.x,
+                                                         point.y,
+                                                         point.z);
         cv::Mat_<double> new_pt = rotation * pt + translation;
 
         transformed_point = cv::Point3d(new_pt(0), new_pt(1), new_pt(2));
@@ -131,7 +137,7 @@ namespace MultiView
         const cv::Mat_<double>& P1,
         const cv::Point2d& x2,
         const cv::Mat_<double>& P2,
-        cv::Point3d& X)
+        cv::Point3d& point)
     {
         cv::Matx43d A;
         for (int i = 0; i <= 2; ++i)
@@ -149,12 +155,67 @@ namespace MultiView
 
         cv::Mat_<double> _X;
         cv::solve(A, B, _X, cv::DECOMP_SVD);
-        X = cv::Point3d(_X(0), _X(1), _X(2));
+        point = cv::Point3d(_X(0), _X(1), _X(2));
+    }
+
+    void iterative_triangulate(
+        const cv::Point2d& x1,
+        const cv::Matx34d& P1,
+        const cv::Point2d& x2,
+        const cv::Matx34d& P2,
+        cv::Point3d& point)
+    {
+        static const int max_iterations = 10;
+
+        double wi1 = 1.0, wi2 = 1.0;
+        cv::Mat_<double> X_(4, 1);
+
+        triangulate(x1, cv::Mat(P1), x2, cv::Mat(P2), point);
+        cv::Mat_<double> X = (cv::Mat_<double>(4, 1) << point.x,
+                                                        point.y,
+                                                        point.z,
+                                                        1.0);
+
+        for (int i = 0; i < max_iterations; ++i)
+        {
+            double p2x1 = cv::Mat_<double>(cv::Mat_<double>(P1).row(2) * X)(0);
+            double p2x2 = cv::Mat_<double>(cv::Mat_<double>(P2).row(2) * X)(0);
+            
+            if (Util::eq(wi1, p2x1) && Util::eq(wi2, p2x2)) break;
+            
+            wi1 = p2x1;
+            wi2 = p2x2;
+            assert(wi1 != 0.0 and wi2 != 0.0);
+
+            cv::Matx43d A;
+            for (int j = 0; j <= 2; ++j)
+            {
+                A(0, j) = (x1.x * P1(2, j) - P1(0, j)) / wi1;
+                A(1, j) = (x1.y * P1(2, j) - P1(1, j)) / wi1;
+                A(2, j) = (x2.x * P2(2, j) - P2(0, j)) / wi2;
+                A(3, j) = (x2.y * P2(2, j) - P2(1, j)) / wi2;
+            }
+
+            cv::Mat_<double> B = (cv::Mat_<double>(4,1) << -(x1.x * P1(2,3) - P1(0,3)) / wi1,
+                                                           -(x1.y * P1(2,3) - P1(1,3)) / wi1,
+                                                           -(x2.x * P2(2,3) - P2(0,3)) / wi2,
+                                                           -(x2.y * P2(2,3) - P2(1,3)) / wi2);
+            
+            solve(A, B, X_, cv::DECOMP_SVD);
+            X(0) = X_(0);
+            X(1) = X_(1);
+            X(2) = X_(2);
+            X(3) = 1.0;
+        }
+
+        point = cv::Point3d(X(0), X(1), X(2));
     }
 
     void triangulate(
         const std::vector<cv::Point2d>& pts1,
+        const cv::Mat& K1,
         const std::vector<cv::Point2d>& pts2,
+        const cv::Mat& K2,
         const cv::Mat& rotation,
         const cv::Mat& translation,
         std::vector<cv::Point3d>& points)
@@ -169,27 +230,56 @@ namespace MultiView
         get_projection(no_rotation, no_translation, P1);
         get_projection(rotation, translation, P2);
 
-        triangulate(pts1, P1, pts2, P2, points);
+        assert(K1.cols == P1.rows && K2.cols == P2.rows);
+        triangulate(pts1, P1, K1, pts2, P2, K2, points);
     }
 
     void triangulate(
         const std::vector<cv::Point2d>& pts1,
         const cv::Mat& P1,
+        const cv::Mat& K1,
         const std::vector<cv::Point2d>& pts2,
         const cv::Mat& P2,
+        const cv::Mat& K2,
         std::vector<cv::Point3d>& points)
     {
+        using namespace std;
         assert(P1.size() == cv::Size(4, 3));
         assert(P2.size() == cv::Size(4, 3));
+        assert(K1.size() == cv::Size(3, 3));
+        assert(K2.size() == cv::Size(3, 3));
         assert(P1.type() == CV_64F);
         assert(P2.type() == CV_64F);
+        assert(K1.type() == CV_64F);
+        assert(K2.type() == CV_64F);
         assert(pts1.size() == pts2.size());
+
+        const cv::Mat K1_inv = K1.inv();
+        const cv::Mat K2_inv = K2.inv();
+        const cv::Mat KP1 = K1 * P1;
+        const cv::Mat KP2 = K2 * P2;
 
         const int n = pts1.size();
         points = std::vector<cv::Point3d>(n);
         for (int i = 0; i < n; ++i)
         {
-            triangulate(pts1[i], P1, pts2[i], P2, points[i]);
+            cv::Mat_<double> p1 = (cv::Mat_<double>(3, 1) << pts1[i].x,
+                                                             pts1[i].y,
+                                                             1.0);
+            cv::Mat_<double> p2 = (cv::Mat_<double>(3, 1) << pts2[i].x,
+                                                             pts2[i].y,
+                                                             1.0);
+            cv::Mat_<double> np1 = K1_inv * p1;
+            cv::Mat_<double> np2 = K2_inv * p2;
+
+            // Ignore the last coordinate.
+            assert(Util::eq(np1(2), 1.0) and Util::eq(np2(2), 1.0));
+
+            cv::Point2d x1(np1(0), np1(1));
+            cv::Point2d x2(np2(0), np2(1));
+
+            // triangulate(u, P1, v, P2, points[i]);
+            iterative_triangulate(x1, P1, x2, P2, points[i]);
         }
     }
 
@@ -197,12 +287,15 @@ namespace MultiView
         const cv::Point3d& point,
         const cv::Mat& rotation,
         const cv::Mat& translation,
+        const cv::Mat& camera,
         cv::Point2d& coordinate)
     {
         cv::Mat projection;
         get_projection(rotation, translation, projection);
 
-        project(point, projection, coordinate);
+        assert(camera.cols == projection.rows);
+        project(point, camera * projection, coordinate);
+        // project(point, projection, coordinate);
     }
 
     void project(
@@ -216,15 +309,15 @@ namespace MultiView
                                                 point.y,
                                                 point.z,
                                                 1.0);
-        cv::Mat proj_pt = projection * pt;
 
+        cv::Mat proj_pt = projection * pt;
         double wx = proj_pt.at<double>(0);
         double wy = proj_pt.at<double>(1);
         double w = proj_pt.at<double>(2);
 
         assert(w != 0.0);
         double x = wx / w;
-        double y = wy / y;
+        double y = wy / w;
 
         coordinate = cv::Point2d(x, y);
     }
@@ -233,12 +326,15 @@ namespace MultiView
         const std::vector<cv::Point3d>& points,
         const cv::Mat& rotation,
         const cv::Mat& translation,
+        const cv::Mat& camera,
         std::vector<cv::Point2d>& coordinates)
     {
         cv::Mat projection;
         get_projection(rotation, translation, projection);
 
-        project(points, projection, coordinates);
+        assert(camera.cols == projection.rows);
+        project(points, camera * projection, coordinates);
+        // project(points, projection, coordinates);
     }
 
     void project(
