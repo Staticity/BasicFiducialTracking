@@ -56,16 +56,6 @@ namespace MultiView
         cv::Mat w, u, vt;
         cv::SVD::compute(E, w, u, vt);
 
-        assert(u.cols == W.rows && W.cols == vt.rows);
-        cv::Mat test_rotation  = u * W * vt;
-        double rot_determinant = cv::determinant(test_rotation);
-
-        // Want rotation matrix of determinant 1
-        if (Util::eq(rot_determinant, -1.0))
-        {
-            vt.row(2) = -vt.row(2);
-        }
-
         assert(u.cols == D.rows && D.cols == vt.rows);
         E = u * D * vt;
     }
@@ -86,6 +76,14 @@ namespace MultiView
         assert(u.cols == W.cols && W.rows == vt.cols);
 
         cv::Mat r1 =  u *   W   * vt;
+
+        // TODO: Fix this recursive bullshit, Jaime. Dipshit
+        if (Util::eq(determinant(r1), -1.0))
+        {
+            get_rotation_and_translation(-E, R, T);
+            return;
+        }
+
         cv::Mat r2 =  u * W.t() * vt;
         cv::Mat t1 =  u.col(2);
         cv::Mat t2 = -u.col(2);
@@ -97,6 +95,8 @@ namespace MultiView
 
         R.push_back(r1);
         T.push_back(t1);
+
+        assert(!Util::eq(determinant(r1), -1.0));
 
         R.push_back(r1);
         T.push_back(t2);

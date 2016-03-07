@@ -98,9 +98,9 @@ void save_ply(
         \nproperty float x\
         \nproperty float y\
         \nproperty float z\
-        \nproperty uchar r\
-        \nproperty uchar g\
-        \nproperty uchar b\
+        \nproperty uchar red\
+        \nproperty uchar green\
+        \nproperty uchar blue\
         \nend_header\n";
 
     ofstream myfile;
@@ -263,9 +263,19 @@ int main(int argc, char** argv)
         return -1;
     }
 
+    for (int i = 0; i < 4; ++i)
+    {
+        // vector<Point3d> cloud;
+        // vector<Point2d> points;
+
+        // Util::mask(clouds[i], inliers[i], cloud);
+        // Util::mask(pts1, inliers[i], points);
+
+        save_ply(im1, clouds[i], pts1, "cloud" + to_string(i)  + ".ply");
+    }
+
     vector<Point3d> best_cloud;
     vector<Point2d> best_points;
-
     Util::mask(clouds[best_index], inliers[best_index], best_cloud);
     Util::mask(pts1, inliers[best_index], best_points);
 
