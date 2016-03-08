@@ -13,6 +13,11 @@
 using namespace std;
 using namespace cv;
 
+// Took the epipolar line visualization code from here!
+// http://www.hasper.info/opencv-draw-epipolar-lines/
+// 
+// Much appreciated.
+
 template <typename T>
 float distancePointLine(const cv::Point_<T> point, const cv::Vec<T,3>& line)
 {
@@ -177,126 +182,4 @@ int main(int argc, char** argv)
     Util::mask(pts1, inliers, best_pts1);
     
     save_ply(im1, cloud, best_pts1, "multiview_cloud.ply");
-
-/*
-    Mat F, E;
-    vector<uchar> fundamental_inliers;
-    MultiView::fundamental(pts1, pts2, F, fundamental_inliers);
-    MultiView::essential(F, camera.matrix(), camera.matrix(), E);
-
-    // drawEpipolarLines("epipolar lines", F, im1, im2, pts1, pts2);
-
-    cout << "inliers: " << countNonZero(fundamental_inliers) << endl;
-
-    vector<Point2d> best_pts1, best_pts2;
-    Util::mask(pts1, fundamental_inliers, best_pts1);
-    Util::mask(pts2, fundamental_inliers, best_pts2);
-
-    pts1 = best_pts1;
-    pts2 = best_pts2;
-
-    vector<cv::Mat> rotations, translations;
-    MultiView::get_rotation_and_translation(E, rotations, translations);
-
-    int n = rotations.size();
-    vector<vector<Point3d> > clouds(n);
-    vector<vector<uchar> > inliers(n);
-    vector<double> in_front_percent1(n), in_front_percent2(n);
-    vector<double> projection_error1(n), projection_error2(n);
-
-    for (int i = 0; i < n; ++i)
-    {
-        Mat rotation = rotations[i];
-        Mat translation = translations[i];
-
-        Mat no_rotation = Mat::eye(3, 3, CV_64F);
-        Mat no_translation = Mat::zeros(3, 1, CV_64F);
-        
-        MultiView::triangulate(
-            pts1, camera.matrix(),
-            pts2, camera.matrix(),
-            rotation, translation,
-            clouds[i]);
-
-        vector<Point2d> projected_pts1, projected_pts2;
-        MultiView::project(clouds[i], no_rotation, no_translation, camera.matrix(), projected_pts1);
-        MultiView::project(clouds[i], rotation, translation, camera.matrix(), projected_pts2);
-
-        double in_front1 = 0.0, in_front2 = 0.0;
-        double proj_err1 = 0.0, proj_err2 = 0.0;
-
-        int num_points = pts1.size();
-        for (int j = 0; j < num_points; ++j)
-        {
-            Point3d pt3d1, pt3d2;
-            pt3d1 = clouds[i][j];
-            MultiView::transform(pt3d1, rotation, translation, pt3d2);
-
-            in_front1 += pt3d1.z > 0.0;
-            in_front2 += pt3d2.z > 0.0;
-            inliers[i].push_back(pt3d1.z > 0.0 and pt3d2.z > 0.0);
-
-            proj_err1 += norm(Mat(pts1[j]), Mat(projected_pts1[j]));
-            proj_err2 += norm(Mat(pts2[j]), Mat(projected_pts2[j]));
-        }
-
-        assert(num_points != 0);
-        in_front1 /= num_points;
-        in_front2 /= num_points;
-        proj_err1 /= num_points;
-        proj_err2 /= num_points;
-
-        in_front_percent1[i] = in_front1;
-        in_front_percent2[i] = in_front2;
-        projection_error1[i] = proj_err1;
-        projection_error2[i] = proj_err2;
-    }
-
-    int best_index = -1;
-    for (int i = 0; i < 4; ++i)
-    {
-        if (in_front_percent1[i] > 0.75 &&
-            in_front_percent2[i] > 0.75)
-        {
-            best_index = i;
-            break;
-        }
-    }
-
-    cout << best_index << endl;
-
-    for (int i = 0; i < 4; ++i)
-    {
-        printf("%ld: (%f, %f) and (%f, %f)\n",
-            clouds[i].size(),
-            in_front_percent1[i],
-            in_front_percent2[i],
-            projection_error1[i],
-            projection_error2[i]);
-    }
-
-    if (best_index == -1)
-    {
-        printf("Couldn't find a proper cloud.\n");
-        return -1;
-    }
-
-    for (int i = 0; i < 4; ++i)
-    {
-        // vector<Point3d> cloud;
-        // vector<Point2d> points;
-
-        // Util::mask(clouds[i], inliers[i], cloud);
-        // Util::mask(pts1, inliers[i], points);
-
-        save_ply(im1, clouds[i], pts1, "cloud" + to_string(i)  + ".ply");
-    }
-
-    vector<Point3d> best_cloud;
-    vector<Point2d> best_points;
-    Util::mask(clouds[best_index], inliers[best_index], best_cloud);
-    Util::mask(pts1, inliers[best_index], best_points);
-
-    save_ply(im1, best_cloud, best_points, "cloud.ply");
-    */
 }
