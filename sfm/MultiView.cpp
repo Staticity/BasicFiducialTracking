@@ -35,8 +35,8 @@ namespace MultiView
 
     void essential(
         const cv::Mat& F,
-        const Camera& c1,
-        const Camera& c2,
+        const cv::Mat& K1,
+        const cv::Mat& K2,
         cv::Mat& E)
     {
         static cv::Mat W = (cv::Mat_<double>(3, 3) << 0, -1,  0,
@@ -46,9 +46,6 @@ namespace MultiView
         static cv::Mat D = (cv::Mat_<double>(3, 3) << 1,  0,  0,
                                                       0,  1,  0,
                                                       0,  0,  0);
-
-        const cv::Mat K1 = c1.matrix();
-        const cv::Mat K2 = c2.matrix();
 
         // K2.rows because K2.t()
         assert(K2.rows == F.rows && F.cols == K1.rows);
@@ -296,9 +293,105 @@ namespace MultiView
             cv::Point2d x1(np1(0), np1(1));
             cv::Point2d x2(np2(0), np2(1));
 
-            // triangulate(u, P1, v, P2, points[i]);
             iterative_triangulate(x1, P1, x2, P2, points[i]);
         }
+    }
+
+    void triangulate(
+        const std::vector<cv::Point2d>& pts1,
+        const cv::Mat& K1,
+        const std::vector<cv::Point2d>& pts2,
+        const cv::Mat& K2,
+        std::vector<cv::Point3d>& points)
+    {
+        static const double min_percent_in_front = 0.75;
+        cv::Mat F, E;
+        std::vector<uchar> fundamental_inliers;
+        fundamental(pts1, pts2, F, fundamental_inliers);
+        essential(F, K1, K2, E);
+
+        std::vector<cv::Point2d> best_pts1, best_pts2;
+        Util::mask(pts1, fundamental_inliers, best_pts1);
+        Util::mask(pts2, fundamental_inliers, best_pts2);
+
+        std::vector<cv::Mat> rotations, translations;
+        get_rotation_and_translation(E, rotations, translations);
+
+        int n = rotations.size();
+        std::vector<std::vector<cv::Point3d> > clouds(n);
+        std::vector<std::vector<uchar> > inliers(n);
+        std::vector<double> in_front_percent1(n), in_front_percent2(n);
+        std::vector<double> projection_error1(n), projection_error2(n);
+
+        for (int i = 0; i < n; ++i)
+        {
+            cv::Mat rotation = rotations[i];
+            cv::Mat translation = translations[i];
+
+            cv::Mat no_rotation = cv::Mat::eye(3, 3, CV_64F);
+            cv::Mat no_translation = cv::Mat::zeros(3, 1, CV_64F);
+            
+            triangulate(
+                best_pts1,
+                K1,
+                best_pts2,
+                K2,
+                rotation,
+                translation,
+                clouds[i]);
+
+            std::vector<cv::Point2d> projected_pts1, projected_pts2;
+            project(clouds[i], no_rotation, no_translation, K1, projected_pts1);
+            project(clouds[i], rotation, translation, K2, projected_pts2);
+
+            double in_front1 = 0.0, in_front2 = 0.0;
+            double proj_err1 = 0.0, proj_err2 = 0.0;
+
+            int num_points = best_pts1.size();
+            for (int j = 0; j < num_points; ++j)
+            {
+                cv::Point3d pt3d1, pt3d2;
+                pt3d1 = clouds[i][j];
+                transform(pt3d1, rotation, translation, pt3d2);
+
+                in_front1 += pt3d1.z > 0.0;
+                in_front2 += pt3d2.z > 0.0;
+                inliers[i].push_back(pt3d1.z > 0.0 and pt3d2.z > 0.0);
+
+                proj_err1 += cv::norm(cv::Mat(best_pts1[j]), cv::Mat(projected_pts1[j]));
+                proj_err2 += cv::norm(cv::Mat(best_pts2[j]), cv::Mat(projected_pts2[j]));
+            }
+
+            assert(num_points != 0);
+            in_front1 /= num_points;
+            in_front2 /= num_points;
+            proj_err1 /= num_points;
+            proj_err2 /= num_points;
+
+            in_front_percent1[i] = in_front1;
+            in_front_percent2[i] = in_front2;
+            projection_error1[i] = proj_err1;
+            projection_error2[i] = proj_err2;
+        }
+
+        int best_index = -1;
+        for (int i = 0; i < 4; ++i)
+        {
+            if (in_front_percent1[i] > min_percent_in_front &&
+                in_front_percent2[i] > min_percent_in_front)
+            {
+                best_index = i;
+                break;
+            }
+        }
+
+        if (best_index == -1)
+        {
+            printf("Couldn't find a proper cloud.\n");
+            return;
+        }
+
+        points = clouds[best_index];
     }
 
     void project(

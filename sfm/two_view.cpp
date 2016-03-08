@@ -164,7 +164,7 @@ int main(int argc, char** argv)
     Mat F, E;
     vector<uchar> fundamental_inliers;
     MultiView::fundamental(pts1, pts2, F, fundamental_inliers);
-    MultiView::essential(F, camera, camera, E);
+    MultiView::essential(F, camera.matrix(), camera.matrix(), E);
 
     // drawEpipolarLines("epipolar lines", F, im1, im2, pts1, pts2);
 

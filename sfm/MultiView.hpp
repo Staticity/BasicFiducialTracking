@@ -17,8 +17,8 @@ namespace MultiView
 
     void essential(
         const cv::Mat& F,
-        const Camera& c1,
-        const Camera& c2,
+        const cv::Mat& K1,
+        const cv::Mat& K2,
         cv::Mat& E);
 
     void get_rotation_and_translation(
@@ -69,6 +69,13 @@ namespace MultiView
         const cv::Mat& translation,
         std::vector<cv::Point3d>& points);
 
+    void triangulate(
+        const std::vector<cv::Point2d>& pts1,
+        const cv::Mat& K1,
+        const std::vector<cv::Point2d>& pts2,
+        const cv::Mat& K2,
+        std::vector<cv::Point3d>& points);
+
     void project(
         const cv::Point3d& point,
         const cv::Mat& rotation,
@@ -92,6 +99,7 @@ namespace MultiView
         const std::vector<cv::Point3d>& points,
         const cv::Mat& projection,
         std::vector<cv::Point2d>& coordinates);
+
 }
 
 #endif
