@@ -74,6 +74,7 @@ namespace MultiView
         const cv::Mat& K1,
         const std::vector<cv::Point2d>& pts2,
         const cv::Mat& K2,
+        std::vector<unsigned char>& inliers,
         std::vector<cv::Point3d>& points);
 
     void project(

@@ -103,6 +103,8 @@ void save_ply(
         \nproperty uchar blue\
         \nend_header\n";
 
+    assert(points.size() == img_points.size());
+
     ofstream myfile;
     myfile.open(filename);
     myfile << header;
@@ -161,6 +163,22 @@ int main(int argc, char** argv)
         pts2.push_back(feat2[matches[i].trainIdx].pt);
     }
 
+    std::vector<uchar> inliers;
+    std::vector<cv::Point3d> cloud;
+    MultiView::triangulate(
+        pts1,
+        camera.matrix(),
+        pts2,
+        camera.matrix(),
+        inliers,
+        cloud);
+
+    std::vector<cv::Point2d> best_pts1;
+    Util::mask(pts1, inliers, best_pts1);
+    
+    save_ply(im1, cloud, best_pts1, "multiview_cloud.ply");
+
+/*
     Mat F, E;
     vector<uchar> fundamental_inliers;
     MultiView::fundamental(pts1, pts2, F, fundamental_inliers);
@@ -280,4 +298,5 @@ int main(int argc, char** argv)
     Util::mask(pts1, inliers[best_index], best_points);
 
     save_ply(im1, best_cloud, best_points, "cloud.ply");
+    */
 }

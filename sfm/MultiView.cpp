@@ -302,24 +302,39 @@ namespace MultiView
         const cv::Mat& K1,
         const std::vector<cv::Point2d>& pts2,
         const cv::Mat& K2,
+        std::vector<unsigned char>& inliers,
         std::vector<cv::Point3d>& points)
     {
         static const double min_percent_in_front = 0.75;
+
+        assert(pts1.size() == pts2.size());
+
         cv::Mat F, E;
-        std::vector<uchar> fundamental_inliers;
-        fundamental(pts1, pts2, F, fundamental_inliers);
+        fundamental(pts1, pts2, F, inliers);
         essential(F, K1, K2, E);
 
+        assert(inliers.size() == pts1.size());
+        assert(inliers.size() == pts2.size());
+
         std::vector<cv::Point2d> best_pts1, best_pts2;
-        Util::mask(pts1, fundamental_inliers, best_pts1);
-        Util::mask(pts2, fundamental_inliers, best_pts2);
+        Util::mask(pts1, inliers, best_pts1);
+        Util::mask(pts2, inliers, best_pts2);
+
+        std::vector<int> indices;
+        for (int i = 0; i < inliers.size(); ++i)
+        {
+            indices.push_back(i);
+        }
+
+        std::vector<int> best_indices;
+        Util::mask(indices, inliers, best_indices);
 
         std::vector<cv::Mat> rotations, translations;
         get_rotation_and_translation(E, rotations, translations);
 
         int n = rotations.size();
         std::vector<std::vector<cv::Point3d> > clouds(n);
-        std::vector<std::vector<uchar> > inliers(n);
+        std::vector<std::vector<uchar> > in_front_inliers(n);
         std::vector<double> in_front_percent1(n), in_front_percent2(n);
         std::vector<double> projection_error1(n), projection_error2(n);
 
@@ -356,7 +371,8 @@ namespace MultiView
 
                 in_front1 += pt3d1.z > 0.0;
                 in_front2 += pt3d2.z > 0.0;
-                inliers[i].push_back(pt3d1.z > 0.0 and pt3d2.z > 0.0);
+                bool in_front = pt3d1.z > 0.0 and pt3d2.z > 0.0;
+                in_front_inliers[i].push_back(in_front);
 
                 proj_err1 += cv::norm(cv::Mat(best_pts1[j]), cv::Mat(projected_pts1[j]));
                 proj_err2 += cv::norm(cv::Mat(best_pts2[j]), cv::Mat(projected_pts2[j]));
@@ -391,7 +407,14 @@ namespace MultiView
             return;
         }
 
-        points = clouds[best_index];
+        Util::mask(clouds[best_index], in_front_inliers[best_index], points);
+
+        for (int i = 0; i < in_front_inliers[best_index].size(); ++i)
+        {
+            inliers[best_indices[i]] &= in_front_inliers[best_index][i];
+        }
+
+        assert(cv::countNonZero(inliers) == points.size());
     }
 
     void project(
