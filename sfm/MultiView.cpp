@@ -2,6 +2,7 @@
 
 #include <calib3d.hpp>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 
 #include "Camera.hpp"
@@ -75,18 +76,35 @@ namespace MultiView
         assert(u.cols == W.rows && W.rows == vt.cols);
         assert(u.cols == W.cols && W.rows == vt.cols);
 
-        cv::Mat r1 =  u *   W   * vt;
+        cv::Mat r1, r2, t1, t2;
 
-        // TODO: Fix this recursive bullshit, Jaime. Dipshit
-        if (Util::eq(determinant(r1), -1.0))
+        r1 = u * W * vt;
+
+        cv::Mat essential = E;
+        const int max_iterations = 3;
+        int iterations = 0;
+        while (Util::eq(determinant(r1), -1.0) && iterations < max_iterations)
         {
-            get_rotation_and_translation(-E, R, T);
+            essential = -essential;
+            cv::SVD::compute(essential, w, u, vt);
+            r1 = u * W * vt;
+            ++iterations;
+        }
+
+        if (iterations >= max_iterations)
+        {
+            printf("Exceeded max number of iterations for rotation construction.\n");
+            R.clear();
+            T.clear();
             return;
         }
 
-        cv::Mat r2 =  u * W.t() * vt;
-        cv::Mat t1 =  u.col(2);
-        cv::Mat t2 = -u.col(2);
+        r2 =  u * W.t() * vt;
+        t1 =  u.col(2);
+        t2 = -u.col(2);
+
+        assert(Util::eq(determinant(r1), 1.0));
+        assert(Util::eq(determinant(r2), 1.0));
 
         assert(r1.size() == cv::Size(3, 3));
         assert(r2.size() == cv::Size(3, 3));
