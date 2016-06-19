@@ -69,7 +69,7 @@ void findPutativeMatches(
                 assert(rect2.contains(matches[i - 1][j].pt2));
             }
 
-            assert(!matches[i].empty());            
+            assert(!matches[i - 1].empty());            
         }
     }
 }
@@ -165,8 +165,8 @@ Mat estimateHomography(
     vector<uchar>& inliers)
 {
     double inlier_threshold = 1.0; // Need to change
-    double update_ratio = 0.8; // Need to change
-    int iterations = 500; // Need to change
+    double update_ratio = 0.9; // Need to change
+    int iterations = 1000; // Need to change
 
     Mat best_homography;
     vector<int> best_inliers;
@@ -332,20 +332,21 @@ Mat estimateHomography(
 Mat mergeImages(
     const Mat& im1,
     const Mat& im2,
-    const Mat& homography)
+    const Mat& homography,
+    Mat& translation)
 {
     assert(im1.type() == im2.type());
 
     double minX, minY, maxX, maxY;
 
     // shift to 0-index for index warping
-    double cols2 = im2.cols - 1.0;
-    double rows2 = im2.rows - 1.0;
+    double cols1 = im1.cols - 1.0;
+    double rows1 = im1.rows - 1.0;
 
     Mat corners = (Mat_<double>(4, 3) <<     0,     0, 1,
-                                         cols2,     0, 1,
-                                             0, rows2, 1,
-                                         cols2, rows2, 1);
+                                         cols1,     0, 1,
+                                             0, rows1, 1,
+                                         cols1, rows1, 1);
 
     Mat warped_corners = homography * corners.t();
 
@@ -385,15 +386,15 @@ Mat mergeImages(
 
     minX = min(0.0, minX);
     minY = min(0.0, minY);
-    maxX = max((double)im1.cols, maxX);
-    maxY = max((double)im1.rows, maxY);
+    maxX = max((double)im2.cols, maxX);
+    maxY = max((double)im2.rows, maxY);
 
     int rows = (int)(ceil(maxY) - floor(minY));
     int cols = (int)(ceil(maxX) - floor(minX));
 
-    Mat translation = (Mat_<double>(3, 3) << 1, 0, -minX,
-                                             0, 1, -minY,
-                                             0, 0,     1);
+    translation = (Mat_<double>(3, 3) << 1, 0, -minX,
+                                         0, 1, -minY,
+                                         0, 0,     1);
 
     Mat inv_homography = (translation * homography).inv();
 
@@ -401,9 +402,11 @@ Mat mergeImages(
     im2.copyTo(merged(Rect(-minX, -minY, im2.cols, im2.rows)));
 
     // update to range of im2
-    for (int i = start_row; i < warped_rows; ++i)
+    // for (int i = p; i < warped_rows; ++i)
+    for (int i = 0; i < merged.rows; ++i)
     {
-        for (int j = start_col; j < warped_cols; ++j)
+        // for (int j = start_col; j < warped_cols; ++j)
+        for (int j = 0; j < merged.cols; ++j)
         {
             Mat pt = (Mat_<double>(3, 1) << j, i, 1);
             Mat_<double> inv_pt = inv_homography * pt;
@@ -447,6 +450,32 @@ Mat mergeImages(
     return merged;
 }
 
+Mat mergeImages(const vector<Mat>& images)
+{
+    assert(images.size() >= 2);
+
+    vector<vector<ImageMatch> > matches;
+    findPutativeMatches(images, matches);
+
+    vector<uchar> inliers;
+    vector<Mat> homographies;
+    for (int i = 0; i < images.size() - 1; ++i)
+    {
+        homographies.push_back(estimateHomography(matches[i], inliers));
+    }
+
+    Mat merged = images.back();
+    Mat homography = Mat::eye(3, 3, CV_64F);
+    Mat translation = Mat::eye(3, 3, CV_64F);
+    for (int i = images.size() - 2; i >= 0; --i)
+    {
+        homography = translation * homographies[i] * homography;
+        merged = mergeImages(images[i], merged, homography, translation);
+    }
+
+    return merged;
+}
+
 int main(int argc, char** argv)
 {
     assert(argc >= 3);
@@ -456,18 +485,18 @@ int main(int argc, char** argv)
     {
         images.push_back(imread(argv[i]));
     }
+    Mat merged = mergeImages(images);
 
-    vector<vector<ImageMatch> > matches;
-    findPutativeMatches(images, matches);
+    // vector<vector<ImageMatch> > matches;
+    // findPutativeMatches(images, matches);
     // visualizeMatches(images, matches);
 
-    vector<uchar> inliers;
-    Mat homography = estimateHomography(matches[0], inliers);
+    // vector<uchar> inliers;
+    // Mat homography = estimateHomography(matches[0], inliers);
     // visualizeMatches(images, matches, inliers);
-    Mat merged = mergeImages(images[0], images[1], homography);
     imshow("merged", merged);
     waitKey();
     destroyWindow("merged");
 
-    // imwrite("panorama.jpg", merged);
+    imwrite("panorama.jpg", merged);
 }
