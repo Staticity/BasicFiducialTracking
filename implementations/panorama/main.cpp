@@ -272,8 +272,8 @@ Mat estimateHomography(
             assert(solve(A, B, X, DECOMP_NORMAL));
 
             H = (Mat_<double>(3, 3) << X(0), X(1), X(2),
-                                      X(3), X(4), X(5),
-                                      X(6), X(7),   1);
+                                       X(3), X(4), X(5),
+                                       X(6), X(7),   1);
 
             inlier_indices.clear();
             double total_error = 0.0f;
