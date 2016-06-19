@@ -2,6 +2,7 @@
 #include <xfeatures2d.hpp>
 #include <iostream>
 #include <string>
+#include <map>
 
 using namespace cv;
 using namespace std;
@@ -16,6 +17,8 @@ struct ImageMatch
     Point2d pt1;
     Point2d pt2;
 };
+
+// vector<ImageMatch> deleteThis;
 
 Scalar randomColor(RNG& rng)
 {
@@ -320,6 +323,7 @@ Mat estimateHomography(
     for (int i = 0; i < best_inliers.size(); ++i)
     {
         inliers[best_inliers[i]] = 1;
+        // deleteThis.push_back(matches[best_inliers[i]]);
     }
 
     return best_homography;
@@ -387,11 +391,11 @@ Mat mergeImages(
     int rows = (int)(ceil(maxY) - floor(minY));
     int cols = (int)(ceil(maxX) - floor(minX));
 
-    Mat translation = (Mat_<double>(3, 3) << 1, 0, minX,
-                                             0, 1, minY,
+    Mat translation = (Mat_<double>(3, 3) << 1, 0, -minX,
+                                             0, 1, -minY,
                                              0, 0,     1);
 
-    Mat inv_homography = translation * homography.inv();
+    Mat inv_homography = (translation * homography).inv();
 
     Mat merged = Mat::zeros(rows, cols, im1.type());
     im2.copyTo(merged(Rect(-minX, -minY, im2.cols, im2.rows)));
@@ -415,6 +419,31 @@ Mat mergeImages(
         }
     }
 
+    // Rect mergedBoundary(0, 0, merged.cols, merged.rows);
+    // for (int i = 0; i < deleteThis.size(); ++i)
+    // {
+    //     const Point2d& im_pt1 = deleteThis[i].pt1;
+    //     const Point2d& im_pt2 = deleteThis[i].pt2;
+
+    //     Mat_<double> pt1 = (Mat_<double>(3, 1) << im_pt1.x, im_pt1.y, 1);
+    //     Mat_<double> pt2 = (Mat_<double>(3, 1) << im_pt2.x, im_pt2.y, 1);
+
+    //     pt1 = translation * homography * pt1;
+    //     pt2 = translation * pt2;
+
+    //     assert(pt1(2) != 0.0);
+    //     assert(pt2(2) != 0.0);
+
+    //     Point2d x1(pt1(0) / pt1(2), pt1(1) / pt1(2));
+    //     Point2d x2(pt2(0) / pt2(2), pt2(1) / pt2(2));
+
+    //     assert(mergedBoundary.contains(x1));
+    //     assert(mergedBoundary.contains(x2));
+
+    //     circle(merged, x1, 5, Scalar(255, 0, 0), 2);
+    //     circle(merged, x2, 5, Scalar(0, 255, 0), 1);
+    // }
+
     return merged;
 }
 
@@ -434,10 +463,11 @@ int main(int argc, char** argv)
 
     vector<uchar> inliers;
     Mat homography = estimateHomography(matches[0], inliers);
-    visualizeMatches(images, matches, inliers);
+    // visualizeMatches(images, matches, inliers);
     Mat merged = mergeImages(images[0], images[1], homography);
     imshow("merged", merged);
     waitKey();
+    destroyWindow("merged");
 
-    imwrite("panorama.jpg", merged);
+    // imwrite("panorama.jpg", merged);
 }
