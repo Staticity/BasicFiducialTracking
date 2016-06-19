@@ -208,8 +208,8 @@ Mat estimateHomography(
         }
 
         Mat H = (Mat_<double>(3, 3) << X(0), X(1), X(2),
-                                      X(3), X(4), X(5),
-                                      X(6), X(7),   1);
+                                       X(3), X(4), X(5),
+                                       X(6), X(7),   1);
 
         vector<int> inlier_indices;
         for (int i = 0; i < matches.size(); ++i)
