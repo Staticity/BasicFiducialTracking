@@ -1,6 +1,6 @@
 CC          = c++
 LFLAGS      = 
-CFLAGS      = -c 
+CFLAGS      = -c -Wall -pedantic -std=c++11
 #MAIN_OBJS   =  Util.o Camera.o MultiView.o
 INCLUDE_DIR = -I/usr/local/include/opencv -I/usr/local/include/opencv2
 LIBRARIES   = -lopencv_calib3d     \
@@ -22,21 +22,11 @@ LIBRARIES   = -lopencv_calib3d     \
               -lopencv_videostab   \
               -lopencv_xfeatures2d
 
-
 run.o: main.o
 	$(CC) $(LFLAGS) $(OBJS) main.o -o run.o $(INCLUDE_DIR) $(LIBRARIES)
 
-main.o: #Camera.o MultiView.o
+main.o:
 	$(CC) $(CFLAGS) main.cpp $(INCLUDE_DIR)
-
-MultiView.o: MultiView.cpp
-	$(CC) $(CFLAGS) MultiView.hpp MultiView.cpp $(INCLUDE_DIR)
-
-Camera.o: Camera.cpp
-	$(CC) $(CFLAGS) Camera.hpp Camera.cpp $(INCLUDE_DIR)
-
-Util.o:
-	$(CC) $(CFLAGS) Util.hpp $(INCLUDE_DIR)
 
 clean:
 	rm -f *.o

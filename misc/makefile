@@ -35,17 +35,17 @@ main.o: Camera.o VanillaTracker.o HybridMatcher.o
 two_view.o: Camera.o VanillaTracker.o HybridMatcher.o
 	$(CC) $(CFLAGS) two_view.cpp $(INCLUDE_DIR)
 
-correspondences.o: Camera.o misc/correspondences.cpp
-	$(CC) $(LFLAGS) misc/correspondences.cpp Camera.o -o correspondences.o $(INCLUDE_DIR) $(LIBRARIES)
+correspondences.o: Camera.o correspondences.cpp
+	$(CC) $(LFLAGS) correspondences.cpp Camera.o -o correspondences.o $(INCLUDE_DIR) $(LIBRARIES)
 
-square_detect.o: misc/square_detect.cpp
-	$(CC) $(LFLAGS) misc/square_detect.cpp -o square_detect.o $(INCLUDE_DIR) $(LIBRARIES)
+square_detect.o: square_detect.cpp
+	$(CC) $(LFLAGS) square_detect.cpp -o square_detect.o $(INCLUDE_DIR) $(LIBRARIES)
 
 snap_pictures.o:
 	$(CC) $(LFLAGS) snap_pictures.cpp -o snap_pictures.o $(INCLUDE_DIR) $(LIBRARIES)
 
 video_stream.o:
-	$(CC) $(LFLAGS) misc/video_stream.cpp -o video_stream.o $(INCLUDE_DIR) $(LIBRARIES)
+	$(CC) $(LFLAGS) video_stream.cpp -o video_stream.o $(INCLUDE_DIR) $(LIBRARIES)
 
 Util.o:
 	$(CC) $(CFLAGS) Util.hpp $(INCLUDE_DIR)

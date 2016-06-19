@@ -509,7 +509,7 @@ int main(int argc, char** argv)
     if (argc > 1)
         index = atoi(argv[1]);
 
-    string camera_calib_filename = "calibration_data/out_camera_data.xml";
+    string camera_calib_filename = "../calibration_data/out_camera_data.xml";
     FileStorage fs(camera_calib_filename, FileStorage::READ);
 
     Mat camera_matrix, distortion_coeff;
@@ -559,14 +559,14 @@ int main(int argc, char** argv)
 
                 // draw_sorted_corners(image, quad);
                 // draw_image_in_quad(image, quad, image.clone());
-                 draw_image_in_quad_rec(image, quad, 3);
+                draw_image_in_quad_rec(image, quad, 3);
 
                 Mat rot, trans;
-                get_square_pose(quad, camera_matrix, distortion_coeff, rot, trans);
+                // get_square_pose(quad, camera_matrix, distortion_coeff, rot, trans);
                 // cout << "Rotation\n" << rot << endl;
                 // cout << "Translation\n" << trans << endl << endl;
 
-               //  draw_cube_with_pose(image, rot, trans, camera_matrix, distortion_coeff);
+                // draw_cube_with_pose(image, rot, trans, camera_matrix, distortion_coeff);
             }
         }
 

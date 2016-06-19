@@ -108,6 +108,7 @@ void save_ply(
         \nproperty uchar blue\
         \nend_header\n";
 
+    cout << points.size() << " " << img_points.size() << endl;
     assert(points.size() == img_points.size());
 
     ofstream myfile;
@@ -156,10 +157,10 @@ int main(int argc, char** argv)
     vector<DMatch> matches;
     Features::findMatches(im1, im2, feat1, feat2, desc1, desc2, matches);
 
-    // Mat drawing;
-    // drawMatches(im1, feat1, im2, feat2, matches, drawing);
-    // imshow("drawing", drawing);
-    // waitKey();
+    Mat drawing;
+    drawMatches(im1, feat1, im2, feat2, matches, drawing);
+    imshow("drawing", drawing);
+    waitKey();
 
     std::vector<Point2d> pts1, pts2;
     for (int i = 0; i < matches.size(); ++i)
@@ -181,5 +182,8 @@ int main(int argc, char** argv)
     std::vector<cv::Point2d> best_pts1;
     Util::mask(pts1, inliers, best_pts1);
     
-    save_ply(im1, cloud, best_pts1, "multiview_cloud.ply");
+    if (!cloud.empty())
+    {
+      save_ply(im1, cloud, best_pts1, "multiview_cloud.ply");
+    }
 }

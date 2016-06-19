@@ -390,6 +390,7 @@ namespace MultiView
             projection_error2[i] = proj_err2;
         }
 
+
         int best_index = -1;
         for (int i = 0; i < 4; ++i)
         {
@@ -400,6 +401,18 @@ namespace MultiView
                 break;
             }
         }
+
+        std::cout << best_index << std::endl;
+        for (int i = 0; i < 4; ++i)
+        {
+            printf("%ld: (%f, %f) and (%f, %f)\n",
+                clouds[i].size(),
+                in_front_percent1[i],
+                in_front_percent2[i],
+                projection_error1[i],
+                projection_error2[i]);
+        }
+
 
         if (best_index == -1)
         {
