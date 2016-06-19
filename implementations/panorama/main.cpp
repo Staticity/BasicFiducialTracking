@@ -283,7 +283,7 @@ Mat estimateHomography(
                 Mat_<double> sourcePt = (Mat_<double>(3, 1) << x1, y1, 1);
                 Mat_<double> destPt = H * sourcePt;
 
-                assert(destPt(2) != 0.0f);
+                assert(destPt(2) != 0.0);
                 double hx2 = destPt(0) / destPt(2);
                 double hy2 = destPt(1) / destPt(2);
 
@@ -297,7 +297,7 @@ Mat estimateHomography(
             }
 
             double avg_error = total_error / matches.size();
-            if (avg_error < best_avg_error || best_avg_error < 0)
+            if (avg_error < best_avg_error || best_avg_error < 0.0)
             {
                 if (inlier_indices.size() > max_inliers)
                 {
