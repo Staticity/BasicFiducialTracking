@@ -332,10 +332,7 @@ Mat mergeImages(
 {
     assert(im1.type() == im2.type());
 
-    double minX = 0.0;
-    double minY = 0.0;
-    double maxX = im1.cols;
-    double maxY = im1.rows;
+    double minX, minY, maxX, maxY;
 
     // shift to 0-index for index warping
     double cols2 = im2.cols - 1.0;
@@ -346,10 +343,11 @@ Mat mergeImages(
                                              0, rows2, 1,
                                          cols2, rows2, 1);
 
+    Mat warped_corners = homography * corners.t();
+
     for (int i = 0; i < 4; ++i)
     {
-        Mat corner = corners.row(i).t();
-        Mat_<double> warped = homography * corner;
+        Mat_<double> warped = warped_corners.col(i);
 
         assert(warped(2) != 0.0);
         double x = warped(0) / warped(2);
@@ -359,7 +357,35 @@ Mat mergeImages(
         minY = min(minY, y);
         maxX = max(maxX, x);
         maxY = max(maxY, y);
+
+        if (i == 0)
+        {
+            minX = x;
+            maxX = x;
+            minY = y;
+            maxY = y;
+        }
+        else
+        {
+            minX = min(x, minX);
+            minY = min(y, minY);
+            maxX = max(x, maxX);
+            maxY = max(y, maxY);
+        }
     }
+
+    int start_row = minY;
+    int start_col = minX;
+    int warped_rows = start_row + (int)(ceil(maxY) - floor(minY));
+    int warped_cols = start_col + (int)(ceil(maxX) - floor(minX));
+
+    minX = min(0.0, minX);
+    minY = min(0.0, minY);
+    maxX = max((double)im1.cols, maxX);
+    maxY = max((double)im1.rows, maxY);
+
+    int rows = (int)(ceil(maxY) - floor(minY));
+    int cols = (int)(ceil(maxX) - floor(minX));
 
     Mat translation = (Mat_<double>(3, 3) << 1, 0, minX,
                                              0, 1, minY,
@@ -367,16 +393,13 @@ Mat mergeImages(
 
     Mat inv_homography = translation * homography.inv();
 
-    int rows = (int)(ceil(maxY) - floor(minY));
-    int cols = (int)(ceil(maxX) - floor(minX));
-
     Mat merged = Mat::zeros(rows, cols, im1.type());
     im2.copyTo(merged(Rect(-minX, -minY, im2.cols, im2.rows)));
 
     // update to range of im2
-    for (int i = 0; i < merged.rows; ++i)
+    for (int i = start_row; i < warped_rows; ++i)
     {
-        for (int j = 0; j < merged.cols; ++j)
+        for (int j = start_col; j < warped_cols; ++j)
         {
             Mat pt = (Mat_<double>(3, 1) << j, i, 1);
             Mat_<double> inv_pt = inv_homography * pt;
