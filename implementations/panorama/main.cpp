@@ -18,8 +18,6 @@ struct ImageMatch
     Point2d pt2;
 };
 
-// vector<ImageMatch> deleteThis;
-
 Scalar randomColor(RNG& rng)
 {
     int icolor = (unsigned) rng;
@@ -175,11 +173,6 @@ Mat estimateHomography(
     int max_inliers = 0;
     while (iterations--)
     {
-        // select random points (4)
-        // find thingamajig
-        // if inliers is within % of max or at least thresh
-        // - compute inlier transform
-
         // choose first 4 elements
         vector<int> indices;
         randomIndices(4, matches.size(), indices);
@@ -323,7 +316,6 @@ Mat estimateHomography(
     for (int i = 0; i < best_inliers.size(); ++i)
     {
         inliers[best_inliers[i]] = 1;
-        // deleteThis.push_back(matches[best_inliers[i]]);
     }
 
     return best_homography;
@@ -422,31 +414,6 @@ Mat mergeImages(
         }
     }
 
-    // Rect mergedBoundary(0, 0, merged.cols, merged.rows);
-    // for (int i = 0; i < deleteThis.size(); ++i)
-    // {
-    //     const Point2d& im_pt1 = deleteThis[i].pt1;
-    //     const Point2d& im_pt2 = deleteThis[i].pt2;
-
-    //     Mat_<double> pt1 = (Mat_<double>(3, 1) << im_pt1.x, im_pt1.y, 1);
-    //     Mat_<double> pt2 = (Mat_<double>(3, 1) << im_pt2.x, im_pt2.y, 1);
-
-    //     pt1 = translation * homography * pt1;
-    //     pt2 = translation * pt2;
-
-    //     assert(pt1(2) != 0.0);
-    //     assert(pt2(2) != 0.0);
-
-    //     Point2d x1(pt1(0) / pt1(2), pt1(1) / pt1(2));
-    //     Point2d x2(pt2(0) / pt2(2), pt2(1) / pt2(2));
-
-    //     assert(mergedBoundary.contains(x1));
-    //     assert(mergedBoundary.contains(x2));
-
-    //     circle(merged, x1, 5, Scalar(255, 0, 0), 2);
-    //     circle(merged, x2, 5, Scalar(0, 255, 0), 1);
-    // }
-
     return merged;
 }
 
@@ -485,18 +452,7 @@ int main(int argc, char** argv)
     {
         images.push_back(imread(argv[i]));
     }
+
     Mat merged = mergeImages(images);
-
-    // vector<vector<ImageMatch> > matches;
-    // findPutativeMatches(images, matches);
-    // visualizeMatches(images, matches);
-
-    // vector<uchar> inliers;
-    // Mat homography = estimateHomography(matches[0], inliers);
-    // visualizeMatches(images, matches, inliers);
-    imshow("merged", merged);
-    waitKey();
-    destroyWindow("merged");
-
     imwrite("panorama.jpg", merged);
 }
