@@ -59,18 +59,18 @@ void findPutativeMatches(
             assert(matches.size() > i - 1);
             matches[i - 1].resize(dmatches.size());
 
-            Rect rect1(Point(), images[i - 1].size());
-            Rect rect2(Point(), images[i].size());
+            // Rect rect1(Point(), images[i - 1].size());
+            // Rect rect2(Point(), images[i].size());
             for (int j = 0; j < dmatches.size(); ++j)
             {
                 matches[i - 1][j].pt1 = features[i - 1][dmatches[j].queryIdx].pt;
                 matches[i - 1][j].pt2 = features[i][dmatches[j].trainIdx].pt;
 
-                assert(rect1.contains(matches[i - 1][j].pt1));
-                assert(rect2.contains(matches[i - 1][j].pt2));
+                // assert(rect1.contains(matches[i - 1][j].pt1));
+                // assert(rect2.contains(matches[i - 1][j].pt2));
             }
 
-            assert(!matches[i - 1].empty());            
+            assert(!matches[i - 1].empty());
         }
     }
 }
@@ -174,7 +174,7 @@ Mat estimateHomography(
         Mat A = createHomographyMatrix(subsetMatches);
 
         Mat u, w, vt;
-        SVD::compute(A, u, w, vt);
+        SVD::compute(A, u, w, vt, cv::SVD::FULL_UV);
 
         Mat_<double> X = vt.row(vt.rows - 1);
         assert(X.rows * X.cols == 9);
@@ -325,10 +325,8 @@ Mat mergeImages(
 
     // update to range of im2
     for (int i = start_row; i < start_row + warped_rows; ++i)
-    // for (int i = 0; i < merged.rows; ++i)
     {
         for (int j = start_col; j < start_col + warped_cols; ++j)
-        // for (int j = 0; j < merged.cols; ++j)
         {
             Mat pt = (Mat_<double>(3, 1) << j, i, 1);
             Mat_<double> inv_pt = inv_homography * pt;
@@ -351,9 +349,11 @@ Mat mergeImages(const vector<Mat>& images)
 {
     assert(images.size() >= 2);
 
+    cout << "Find matches" << endl;
     vector<vector<ImageMatch> > matches;
     findPutativeMatches(images, matches);
 
+    cout << "compute homographies" << endl;
     vector<vector<uchar> > inliers(matches.size());
     vector<Mat> homographies;
     for (int i = 0; i < images.size() - 1; ++i)
@@ -365,6 +365,7 @@ Mat mergeImages(const vector<Mat>& images)
     Mat homography_comp = Mat::eye(3, 3, CV_64F);
     Mat translation_comp = Mat::eye(3, 3, CV_64F);
 
+    cout << "merged images" << endl;
     Mat translation;
     for (int i = images.size() - 2; i >= 0; --i)
     {
