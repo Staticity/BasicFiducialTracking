@@ -118,53 +118,20 @@ void visualizeMatches(
     }    
 }
 
-void randomIndices(int k, int n, vector<int>& indices)
+template <class T>
+void randomElements(int k, vector<T>& v)
 {
     RNG rng(getTickCount());
-    indices.clear();
-    indices.resize(k);
-
     for (int i = 0; i < k; ++i)
     {
-        indices[i] = i;
-    }
-
-    for (int i = k; i < n; ++i)
-    {
-        int j = rng.uniform(0, i + 1);
-        if (j < k)
-            indices[j] = i;
-    }
-
-    assert(indices.size() == k);
-    for (int i = 0; i < indices.size(); ++i)
-    {
-        assert(indices[i] >= 0 && indices[i] < n);
+        int j = rng.uniform(i, v.size() - 1);
+        T temp = v[i];
+        v[i] = v[j];
+        v[j] = temp;
     }
 }
 
-// Mat createHomographyMatrix(const vector<ImageMatch>& matches)
-// {
-//     Mat A = Mat::zeros(matches.size() * 2, 8, CV_64F);
-
-//     for (int i = 0; i < A.rows; i += 2)
-//     {
-//         int index = i / 2;
-//         double x1 = matches[index].pt1.x;
-//         double y1 = matches[index].pt1.y;
-//         double x2 = matches[index].pt2.x;
-//         double y2 = matches[index].pt2.y;
-
-//         Mat xrow = (Mat_<double>(1, 8) << x1, y1, 1,  0,  0, 0, -x1 * x2, -y1 * x2);
-//         Mat yrow = (Mat_<double>(1, 8) <<  0,  0, 0, x1, y1, 1, -x1 * y2, -y1 * y2);
-//         xrow.copyTo(A(Rect(0,   i  , 8, 1)));
-//         yrow.copyTo(A(Rect(0, i + 1, 8, 1)));
-//     }
-
-//     return A;
-// }
-
-Mat createHomographyMatrix2(const vector<ImageMatch>& matches)
+Mat createHomographyMatrix(const vector<ImageMatch>& matches)
 {
     Mat A = Mat::zeros(matches.size() * 2, 9, CV_64F);
 
@@ -190,49 +157,21 @@ Mat estimateHomography(
     vector<uchar>& inliers)
 {
     double inlier_threshold = 1.0; // Need to change
-    // double update_ratio = 0.9; // Need to change
     int iterations = 2000; // Need to change
 
     Mat best_homography;
     vector<int> best_inliers;
-    // double best_avg_error = -1.0;
+
+    vector<ImageMatch> matchesCopy(matches);
 
     int max_inliers = 0;
     while (iterations--)
     {
-        // choose first 4 elements
-        vector<int> indices;
-        randomIndices(4, matches.size(), indices);
+        randomElements(4, matchesCopy);
+        vector<ImageMatch> subsetMatches(matchesCopy.begin(), matchesCopy.begin() + 4);
+        assert(subsetMatches.size() == 4);
 
-        vector<ImageMatch> subsetMatches;
-        for (int i = 0; i < indices.size(); ++i)
-        {
-            assert(indices[i] < matches.size());
-            subsetMatches.push_back(matches[indices[i]]);
-
-            assert(matches[indices[i]].pt1 == subsetMatches[i].pt1);
-            assert(matches[indices[i]].pt2 == subsetMatches[i].pt2);
-        }
-
-        // Set up matrix Ax = b, where x contains homography elements
-        Mat A = createHomographyMatrix2(subsetMatches);
-        // Mat B = Mat::zeros(subsetMatches.size() * 2, 1, CV_64F);
-
-        // for (int i = 0; i < B.rows; i += 2)
-        // {
-        //     int index = i / 2;
-        //     B.at<double>(i) = subsetMatches[index].pt2.x;
-        //     B.at<double>(i + 1) = subsetMatches[index].pt2.y;
-        // }
-
-        // // Solve for homography elements
-        // Mat_<double> X;
-
-        // // Skip collinear points
-        // if (!solve(A, B, X, DECOMP_LU))
-        // {
-        //     continue;
-        // }
+        Mat A = createHomographyMatrix(subsetMatches);
 
         Mat u, w, vt;
         SVD::compute(A, u, w, vt);
@@ -269,7 +208,7 @@ Mat estimateHomography(
 
         // somehow mapping linear least squares didn't work?
         // this is rare... but idfk how it happens
-        if (inlier_indices.size() < indices.size())
+        if (inlier_indices.size() < 4)
         {
             continue;
         }
@@ -277,75 +216,9 @@ Mat estimateHomography(
         if (inlier_indices.size() > max_inliers)
         {
             max_inliers = inlier_indices.size();
-            // best_avg_error = avg_error;
             best_homography = H;
             best_inliers = inlier_indices;
         }
-
-        // Potentially better match, solve for inlier solution
-        // if (inlier_indices.size() >= max_inliers * update_ratio)
-        // {
-        //     subsetMatches.clear();
-        //     subsetMatches.resize(inlier_indices.size());
-        //     for (int i = 0; i < inlier_indices.size(); ++i)
-        //     {
-        //         subsetMatches[i] = matches[inlier_indices[i]];
-        //     }
-
-        //     A = createHomographyMatrix(subsetMatches);
-        //     Mat B = Mat::zeros(subsetMatches.size() * 2, 1, CV_64F);
-
-        //     for (int i = 0; i < B.rows; i += 2)
-        //     {
-        //         int index = i / 2;
-        //         B.at<double>(i) = subsetMatches[index].pt2.x;
-        //         B.at<double>(i + 1) = subsetMatches[index].pt2.y;
-        //     }
-
-        //     assert(solve(A, B, X, DECOMP_NORMAL));
-
-        //     H = (Mat_<double>(3, 3) << X(0), X(1), X(2),
-        //                                X(3), X(4), X(5),
-        //                                X(6), X(7),   1);
-
-        //     inlier_indices.clear();
-        //     double total_error = 0.0f;
-        //     for (int i = 0; i < matches.size(); ++i)
-        //     {
-        //         double x1 = matches[i].pt1.x;
-        //         double y1 = matches[i].pt1.y;    
-        //         double x2 = matches[i].pt2.x;
-        //         double y2 = matches[i].pt2.y;            
-                
-        //         Mat_<double> sourcePt = (Mat_<double>(3, 1) << x1, y1, 1);
-        //         Mat_<double> destPt = H * sourcePt;
-
-        //         assert(destPt(2) != 0.0);
-        //         double hx2 = destPt(0) / destPt(2);
-        //         double hy2 = destPt(1) / destPt(2);
-
-        //         double error = sqrt((hx2 - x2) * (hx2 - x2) + (hy2 - y2) * (hy2 - y2));
-        //         total_error += error;
-
-        //         if (error <= inlier_threshold)
-        //         {
-        //             inlier_indices.push_back(i);
-        //         }
-        //     }
-
-        //     double avg_error = total_error / matches.size();
-        //     if (avg_error < best_avg_error || best_avg_error < 0.0)
-        //     {
-        //         if (inlier_indices.size() > max_inliers)
-        //         {
-        //             max_inliers = inlier_indices.size();
-        //         }
-
-        //         best_avg_error = avg_error;
-        //         best_homography = H;
-        //         best_inliers = inlier_indices;
-        //     }
-        // }
     }
 
     assert(!best_inliers.empty());
@@ -363,18 +236,7 @@ Mat estimateHomography(
     }
 
 
-    Mat A = createHomographyMatrix2(inlierMatches);
-    // Mat B = Mat::zeros(inlierMatches.size() * 2, 1, CV_64F);
-
-    // for (int i = 0; i < B.rows; i += 2)
-    // {
-    //     int index = i / 2;
-    //     B.at<double>(i) = inlierMatches[index].pt2.x;
-    //     B.at<double>(i + 1) = inlierMatches[index].pt2.y;
-    // }
-
-    // Mat_<double> X;
-    // assert(solve(A, B, X, DECOMP_NORMAL));
+    Mat A = createHomographyMatrix(inlierMatches);
 
     Mat u, w, vt;
     SVD::compute(A, u, w, vt);
