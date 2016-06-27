@@ -156,7 +156,7 @@ Mat estimateHomography(
     const vector<ImageMatch>& matches,
     vector<uchar>& inliers)
 {
-    double inlier_threshold = 1.0; // Need to change
+    double inlier_threshold = 3.0; // Need to change
     int iterations = 2000; // Need to change
 
     Mat best_homography;
